@@ -288,7 +288,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       customEmotionConfig.borderColor ||
       dialogStyle.borderColor ||
       defaultEmotionConfig.borderColor;
-console.log('result', customEmotionConfig)
     return {
       backgroundColor: bgColor,
       color: customEmotionConfig.textColor || dialogStyle.textColor || '#ffffff',
