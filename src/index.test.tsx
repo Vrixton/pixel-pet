@@ -236,3 +236,65 @@ describe('PixelPet walking', () => {
     expect(pet).toHaveClass('state-idle');
   });
 });
+
+describe('PixelPet emotions', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  it('shows an emotion every 30 seconds even when the action changes in between', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValue(0);
+    render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).toHaveClass('state-walk');
+
+    for (let second = 0; second < 30; second += 1) {
+      advance(1000);
+    }
+
+    expect(pet).toHaveClass('state-happy');
+  });
+
+  it('clears the emotion after five seconds when tapping a sleeping pet', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(1000);
+    fireEvent.pointerMove(window);
+    advance(120000);
+    expect(pet).toHaveClass('state-sleep');
+
+    fireEvent.click(pet);
+    expect(pet).toHaveClass('state-happy');
+
+    advance(5000);
+
+    expect(pet).toHaveClass('state-idle');
+  });
+
+  it('stays asleep when falling asleep and an automatic emotion happen at the same time', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(120000);
+    expect(pet).toHaveClass('state-sleep');
+
+    advance(10000);
+
+    expect(pet).toHaveClass('state-sleep');
+  });
+});

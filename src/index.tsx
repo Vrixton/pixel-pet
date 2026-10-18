@@ -108,6 +108,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     ),
   };
 
+  const actionRef = useRef<PetAction>(action);
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleCooldownRef = useRef<boolean>(false);
   const isEmotionFrozenRef = useRef<boolean>(false);
@@ -167,8 +168,12 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, []);
 
   useEffect(() => {
+    actionRef.current = action;
+  }, [action]);
+
+  useEffect(() => {
     const emotionInterval = setInterval(() => {
-      if (action === 'sleep') return;
+      if (actionRef.current === 'sleep') return;
 
       const emotions: PetEmotion[] = ['happy', 'angry', 'curious'];
       const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -178,9 +183,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     return () => {
       clearInterval(emotionInterval);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
       if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
     };
-  }, [action]);
+  }, []);
 
   useEffect(() => {
     if (action === 'sleep' || prefersReducedMotion) return;
@@ -292,8 +302,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
+  const visibleEmotion = action === 'sleep' ? null : activeEmotion;
+
   const getCurrentStateClass = () => {
-    if (activeEmotion) return `state-${activeEmotion}`;
+    if (visibleEmotion) return `state-${visibleEmotion}`;
     if (prefersReducedMotion && action === 'walk') return 'state-idle';
     return `state-${action}`;
   };
@@ -331,9 +343,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       onMouseLeave={handleMouseLeave}>
 
       <div className="pixel-pet-status" role="status">
-        {activeEmotion && (isHovered || isFocused || isUserTriggered) && (
+        {visibleEmotion && (isHovered || isFocused || isUserTriggered) && (
           <div className="pixel-pet-dialog" style={getDialogStyle()}>
-            {emotionMessages[activeEmotion]}
+            {emotionMessages[visibleEmotion]}
           </div>
         )}
       </div>
