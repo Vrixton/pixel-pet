@@ -1,0 +1,353 @@
+import React, { useState, useEffect, useRef, CSSProperties } from 'react';
+import catSprite from './cat-sprite.png';
+import './styles.css';
+
+export interface DialogStyleProps {
+  backgroundColor?: string;
+  textColor?: string;
+  borderColor?: string;
+  borderWidth?: string;
+  borderRadius?: string;
+  fontFamily?: string;
+}
+
+export type PetEmotion = 'happy' | 'angry' | 'curious';
+export type PetAction = 'idle' | 'walk' | 'sleep';
+
+export interface PixelPetProps {
+  petName?: string;
+  size?: number;
+  messages?: {
+    default?: React.ReactNode;
+    happy?: React.ReactNode;
+    angry?: React.ReactNode;
+    curious?: React.ReactNode;
+  };
+  // Permitimos pasar una configuración base o estilos personalizados por emoción
+  dialogStyle?: DialogStyleProps;
+  emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
+}
+
+// Estilos o paleta de color por defecto según cada emoción
+const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
+  happy: {
+    backgroundColor: '#1e1c063d',
+    borderColor: '#ffeb3b', // Amarillo
+  },
+  angry: {
+    backgroundColor: '#21090833',
+    borderColor: '#F04037', // Rojo
+  },
+  curious: {
+    backgroundColor: '#1f341d3a',
+    borderColor: '#8BE383', // Verde
+  },
+};
+
+export const PixelPet: React.FC<PixelPetProps> = ({
+  petName = 'Static',
+  size = 60,
+  messages,
+  dialogStyle = {},
+  emotionDialogStyles = {},
+}) => {
+  // --- ESTADOS DE LA MÁQUINA DE ESTADOS ---
+  const [action, setAction] = useState<PetAction>('idle');
+  const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+
+  // Posición y orientación
+  const [posX, setPosX] = useState<number>(100);
+  const [direction, setDirection] = useState<'left' | 'right'>('right');
+
+  // Mensaje formateado en JSX por emoción
+  const emotionMessages: Record<PetEmotion, React.ReactNode> = {
+    happy: messages?.happy || (
+      <>
+        ¡<span className="highlight-pet">{petName}</span> se siente{' '}
+        <span className="highlight-happy">feliz</span>!
+      </>
+    ),
+    angry: messages?.angry || (
+      <>
+        ¡<span className="highlight-pet">{petName}</span> se siente{' '}
+        <span className="highlight-angry">abrumado</span>!
+      </>
+    ),
+    curious: messages?.curious || (
+      <>
+        <span className="highlight-pet">{petName}</span> siente mucha{' '}
+        <span className="highlight-curious">curiosidad</span>
+      </>
+    ),
+  };
+
+  // --- REFERENCIAS DE ESTADO Y TIMERS ---
+  const actionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const idleCooldownRef = useRef<boolean>(false);
+  const isEmotionFrozenRef = useRef<boolean>(false);
+  const emotionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const walkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Registro de emociones y clics
+  const lastEmotionRef = useRef<PetEmotion>('happy');
+  const clickTimestampsRef = useRef<number[]>([]);
+
+  // -------------------------------------------------------------
+  // HELPER: ACTIVAR EMOCIÓN CON CONTROL DE TIEMPO Y LIMPIEZA
+  // -------------------------------------------------------------
+  const triggerEmotion = (emotion: PetEmotion) => {
+    if (action === 'sleep') {
+      setAction('idle');
+    }
+
+    lastEmotionRef.current = emotion;
+    setActiveEmotion(emotion);
+
+    if (emotionTimerRef.current) {
+      clearTimeout(emotionTimerRef.current);
+    }
+
+    emotionTimerRef.current = setTimeout(() => {
+      if (!isEmotionFrozenRef.current) {
+        setActiveEmotion(null);
+      }
+    }, 5000);
+  };
+
+  // -------------------------------------------------------------
+  // REGLA 4: INACTIVIDAD DE MOUSE (SLEEP TRAS 1 MINUTO)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    let inactivityTimer: NodeJS.Timeout;
+
+    const resetInactivity = () => {
+      setAction((prevAction) => {
+        if (prevAction === 'sleep') return 'idle';
+        return prevAction;
+      });
+
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        setActiveEmotion(null);
+        setAction('sleep');
+      }, 120000);
+    };
+
+    window.addEventListener('mousemove', resetInactivity);
+    resetInactivity();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      window.removeEventListener('mousemove', resetInactivity);
+    };
+  }, []);
+
+  // -------------------------------------------------------------
+  // REGLA 5: TIMER GLOBAL DE EMOCIONES (CADA 2 MINUTOS)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const emotionInterval = setInterval(() => {
+      if (action === 'sleep') return;
+
+      const emotions: PetEmotion[] = ['happy', 'angry', 'curious'];
+      const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+
+      triggerEmotion(randomEmotion);
+    }, 30000);
+
+    return () => {
+      clearInterval(emotionInterval);
+      if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
+    };
+  }, [action]);
+
+  // -------------------------------------------------------------
+  // REGLA 3 & 2: BUCLE DE ACCIONES (WALK / IDLE) Y COOLDOWN DE 30s
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (action === 'sleep') return;
+
+    const decideNextAction = () => {
+      if (action === 'idle' && !idleCooldownRef.current) {
+        if (Math.random() > 0.4) {
+          setAction('walk');
+
+          const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
+
+          if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+          actionTimerRef.current = setTimeout(() => {
+            setAction('idle');
+            idleCooldownRef.current = true;
+
+            setTimeout(() => {
+              idleCooldownRef.current = false;
+            }, 30000);
+          }, walkDuration);
+        }
+      } else if (action === 'idle') {
+        if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+        actionTimerRef.current = setTimeout(decideNextAction, 5000);
+      }
+    };
+
+    if (action === 'idle') {
+      decideNextAction();
+    }
+
+    return () => {
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    };
+  }, [action]);
+
+  // -------------------------------------------------------------
+  // REGLA 2: LÓGICA DE MOVIMIENTO HORIZONTAL Y BORDES DE PANTALLA
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (action !== 'walk' || activeEmotion !== null) {
+      if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
+      return;
+    }
+
+    const speed = 2;
+    const minBoundary = 0;
+    const maxBoundary = window.innerWidth - size;
+
+    walkIntervalRef.current = setInterval(() => {
+      setPosX((prevX) => {
+        let nextX = prevX + (direction === 'right' ? speed : -speed);
+
+        if (nextX <= minBoundary || nextX >= maxBoundary) {
+          const choice = Math.random() > 0.5 ? 'idle' : 'turn';
+
+          if (choice === 'idle') {
+            setAction('idle');
+            idleCooldownRef.current = true;
+            setTimeout(() => {
+              idleCooldownRef.current = false;
+            }, 30000);
+            return prevX;
+          } else {
+            setDirection((prevDir) => (prevDir === 'right' ? 'left' : 'right'));
+            return prevX <= minBoundary ? minBoundary + 2 : maxBoundary - 2;
+          }
+        }
+
+        return nextX;
+      });
+    }, 50);
+
+    return () => {
+      if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
+    };
+  }, [action, activeEmotion, direction, size]);
+
+  // -------------------------------------------------------------
+  // REGLA 7: INTERACCIÓN POR CLICS (REACCIÓN Y SPAM DE CLICS)
+  // -------------------------------------------------------------
+  const handleClick = () => {
+    const now = Date.now();
+
+    if (action === 'sleep') {
+      setAction('idle');
+    }
+
+    const recentClicks = [...clickTimestampsRef.current, now].filter(
+      (timestamp) => now - timestamp <= 10000
+    );
+    clickTimestampsRef.current = recentClicks;
+
+    if (recentClicks.length > 5) {
+      clickTimestampsRef.current = [];
+      triggerEmotion('angry');
+    } else {
+      triggerEmotion(lastEmotionRef.current);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // REGLA 6: INTERACCIÓN DE MOUSE (HOVER Y DIÁLOGO)
+  // -------------------------------------------------------------
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (activeEmotion) {
+      isEmotionFrozenRef.current = true;
+      if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (activeEmotion) {
+      isEmotionFrozenRef.current = false;
+      if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
+      emotionTimerRef.current = setTimeout(() => {
+        setActiveEmotion(null);
+      }, 5000);
+    }
+  };
+
+  const getCurrentStateClass = () => {
+    if (activeEmotion) return `state-${activeEmotion}`;
+    return `state-${action}`;
+  };
+
+  // -------------------------------------------------------------
+  // GENERACIÓN DINÁMICA DE ESTILOS SEGÚN EMOCIÓN ACTIVA
+  // -------------------------------------------------------------
+  const getDialogStyle = (): CSSProperties => {
+    if (!activeEmotion) return {};
+
+    // Obtener valores por defecto para la emoción actual
+    const defaultEmotionConfig = DEFAULT_EMOTION_STYLES[activeEmotion] || {};
+
+    // Obtener overrides personalizados pasados por props
+    const customEmotionConfig = emotionDialogStyles[activeEmotion] || {};
+
+    // Combinar propiedades
+    const bgColor =
+      customEmotionConfig.backgroundColor ||
+      dialogStyle.backgroundColor ||
+      defaultEmotionConfig.backgroundColor;
+
+    const borderColor =
+      customEmotionConfig.borderColor ||
+      dialogStyle.borderColor ||
+      defaultEmotionConfig.borderColor;
+console.log('result', customEmotionConfig)
+    return {
+      backgroundColor: bgColor,
+      color: customEmotionConfig.textColor || dialogStyle.textColor || '#ffffff',
+      border: `${customEmotionConfig.borderWidth || dialogStyle.borderWidth || '1px'} solid ${borderColor}`,
+      borderRadius: customEmotionConfig.borderRadius || dialogStyle.borderRadius || '5px',
+      fontFamily: customEmotionConfig.fontFamily || dialogStyle.fontFamily || 'monospace'
+    };
+  };
+
+  return (
+    <div
+      className="pixel-pet-container"
+      style={{ transform: `translateX(${posX}px)` }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}>
+
+      {/* Mostrar globo si hay hover Y emoción activa */}
+      {isHovered && activeEmotion && (
+        <div className="pixel-pet-dialog" style={getDialogStyle()}>
+          {emotionMessages[activeEmotion]}
+        </div>
+      )}
+
+      {/* Renderizado de Sprite */}
+      <div
+        className={`pixel-pet-sprite ${getCurrentStateClass()} ${
+          direction === 'left' ? 'flip-x' : ''
+        }`}
+        style={{
+          backgroundImage: `url(${catSprite})`,
+        }}
+        onClick={handleClick}
+      />
+    </div>
+  );
+};
