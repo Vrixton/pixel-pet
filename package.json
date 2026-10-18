@@ -18,12 +18,13 @@
     "react-dom": ">=16.8.0"
   },
   "devDependencies": {
-    "@types/react": "^18.0.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "tsup": "^8.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5",
     "vite": "^8.3.0"
   },
   "keywords": [
@@ -35,5 +36,9 @@
     "widget"
   ],
   "author": "Victor Villavicencio",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=24"
+  }
 }
