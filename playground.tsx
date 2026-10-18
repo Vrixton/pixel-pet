@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { PixelPet } from './src/index';
 import './src/styles.css';
+import './playground/styles.css';
 
 const variant = new URLSearchParams(window.location.search).get('pet') === 'dog' ? 'dog' : 'cat';
 const petName = "Danko"
