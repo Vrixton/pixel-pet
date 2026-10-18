@@ -183,33 +183,29 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, [action]);
 
   useEffect(() => {
-    if (action === 'sleep') return;
+    if (action === 'sleep' || prefersReducedMotion) return;
 
-    const decideNextAction = () => {
-      if (prefersReducedMotion) return;
+    if (action === 'walk') {
+      const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
 
-      if (!idleCooldownRef.current && Math.random() > 0.4) {
-        setAction('walk');
+      actionTimerRef.current = setTimeout(() => {
+        setAction('idle');
+        idleCooldownRef.current = true;
 
-        const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
+        setTimeout(() => {
+          idleCooldownRef.current = false;
+        }, 30000);
+      }, walkDuration);
+    } else {
+      const decideNextAction = () => {
+        if (!idleCooldownRef.current && Math.random() > 0.4) {
+          setAction('walk');
+          return;
+        }
 
-        if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
-        actionTimerRef.current = setTimeout(() => {
-          setAction('idle');
-          idleCooldownRef.current = true;
+        actionTimerRef.current = setTimeout(decideNextAction, 5000);
+      };
 
-          setTimeout(() => {
-            idleCooldownRef.current = false;
-          }, 30000);
-        }, walkDuration);
-        return;
-      }
-
-      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
-      actionTimerRef.current = setTimeout(decideNextAction, 5000);
-    };
-
-    if (action === 'idle') {
       decideNextAction();
     }
 

@@ -221,4 +221,18 @@ describe('PixelPet walking', () => {
 
     expect(pet).toHaveClass('state-walk');
   });
+
+  it('stops walking when the walk duration ends', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValue(0);
+    render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).toHaveClass('state-walk');
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(pet).toHaveClass('state-idle');
+  });
 });
