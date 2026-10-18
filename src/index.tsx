@@ -20,6 +20,8 @@ const SPRITES: Record<PetVariant, string> = {
   cat: catSprite,
   dog: dogSprite,
 };
+
+const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
 export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
@@ -134,12 +136,16 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       }, 120000);
     };
 
-    window.addEventListener('mousemove', resetInactivity);
+    ACTIVITY_EVENTS.forEach((event) => {
+      window.addEventListener(event, resetInactivity, { passive: true });
+    });
     resetInactivity();
 
     return () => {
       clearTimeout(inactivityTimer);
-      window.removeEventListener('mousemove', resetInactivity);
+      ACTIVITY_EVENTS.forEach((event) => {
+        window.removeEventListener(event, resetInactivity);
+      });
     };
   }, []);
 

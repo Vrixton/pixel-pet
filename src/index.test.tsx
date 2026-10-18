@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PixelPet } from './index';
 
@@ -91,5 +91,66 @@ describe('PixelPet dialog bubble', () => {
     });
 
     expect(getDialog(container)).toBeInTheDocument();
+  });
+});
+
+describe('PixelPet sleep', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const renderAndSleep = () => {
+    render(<PixelPet petName="Danko" />);
+    advance(1000);
+    fireEvent.pointerMove(window);
+    advance(120000);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    expect(pet).toHaveClass('state-sleep');
+    return pet;
+  };
+
+  it('falls asleep two minutes after the last activity', () => {
+    renderAndSleep();
+  });
+
+  it('counts keyboard activity and stays awake', () => {
+    render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(1000);
+    fireEvent.keyDown(window, { key: 'Tab' });
+    advance(119000);
+    fireEvent.keyDown(window, { key: 'Tab' });
+    advance(2000);
+
+    expect(pet).not.toHaveClass('state-sleep');
+  });
+
+  it('wakes up with a key press', () => {
+    const pet = renderAndSleep();
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+
+    expect(pet).not.toHaveClass('state-sleep');
+  });
+
+  it('wakes up with a touch anywhere on the page', () => {
+    const pet = renderAndSleep();
+
+    fireEvent.pointerDown(window, { pointerType: 'touch' });
+
+    expect(pet).not.toHaveClass('state-sleep');
   });
 });
