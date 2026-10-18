@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import catSprite from './cat-sprite.png';
+import dogSprite from './dog-sprite.png';
 import './styles.css';
 
 export interface DialogStyleProps {
@@ -13,9 +14,15 @@ export interface DialogStyleProps {
 
 export type PetEmotion = 'happy' | 'angry' | 'curious';
 export type PetAction = 'idle' | 'walk' | 'sleep';
+export type PetVariant = 'cat' | 'dog';
 
+const SPRITES: Record<PetVariant, string> = {
+  cat: catSprite,
+  dog: dogSprite,
+};
 export interface PixelPetProps {
   petName?: string;
+  variant?: PetVariant;
   size?: number;
   messages?: {
     default?: React.ReactNode;
@@ -23,12 +30,10 @@ export interface PixelPetProps {
     angry?: React.ReactNode;
     curious?: React.ReactNode;
   };
-  // Permitimos pasar una configuración base o estilos personalizados por emoción
   dialogStyle?: DialogStyleProps;
   emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
 }
 
-// Estilos o paleta de color por defecto según cada emoción
 const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
   happy: {
     backgroundColor: '#1e1c063d',
@@ -46,6 +51,7 @@ const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
 
 export const PixelPet: React.FC<PixelPetProps> = ({
   petName = 'Static',
+  variant = 'cat',
   size = 60,
   messages,
   dialogStyle = {},
@@ -344,7 +350,7 @@ console.log('result', customEmotionConfig)
           direction === 'left' ? 'flip-x' : ''
         }`}
         style={{
-          backgroundImage: `url(${catSprite})`,
+          backgroundImage: `url(${SPRITES[variant]})`,
         }}
         onClick={handleClick}
       />
