@@ -9,7 +9,6 @@ body {
 }
 
 
-/* Contenedor principal de la mascota */
 .pixel-pet-container {
   position: fixed;
   bottom: 100px;
@@ -22,7 +21,6 @@ body {
   will-change: transform;
 }
 
-/* Globo de diálogo con texto blanco por defecto */
 .pixel-pet-dialog {
   padding: 6px 10px;
   font-size: 12px;
@@ -35,32 +33,30 @@ body {
   top: -55px;
   white-space: nowrap;
   border: 1px solid;
-  color: #ffffff; /* Texto principal en blanco */
+  color: #ffffff;
   box-shadow: none;
 }
 
-/* --- CLASES DE HIGHLIGHT PERSONALIZADO --- */
 .highlight-pet {
-  color: #FDDBA0; /* Color para el nombre de la mascota */
+  color: #FDDBA0;
   font-weight: bold;
 }
 
 .highlight-happy {
-  color: #ffeb3b; /* Amarillo para la palabra feliz */
+  color: #ffeb3b;
   font-weight: bold;
 }
 
 .highlight-angry {
-  color: #F04037; /* Rojo para la palabra molesta/abrumada */
+  color: #F04037;
   font-weight: bold;
 }
 
 .highlight-curious {
-  color: #8BE383; /* Verde para la palabra curiosa */
+  color: #8BE383;
   font-weight: bold;
 }
 
-/* Sprite de píxeles nítidos */
 .pixel-pet-sprite {
   cursor: pointer;
   image-rendering: pixelated;
@@ -71,12 +67,9 @@ body {
   filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.6)) saturate(140%);
 }
 
-/* Voltear horizontalmente cuando se mueve a la izquierda */
 .pixel-pet-sprite.flip-x {
   transform: scaleX(-1);
 }
-
-/* --- ANIMACIONES (8 Frames x 60px = 480px) --- */
 
 .state-idle {
   animation: catIdle 1s steps(9) infinite;
@@ -104,10 +97,8 @@ body {
 
 .state-curious {
   animation: catCurious 3s steps(9) infinite;
-  /* height: 65px */
 }
 
-/* Keyframes ajustados */
 @keyframes catIdle {
   0% { background-position: 0 -5px; }
   100% { background-position: -605px -5px; }

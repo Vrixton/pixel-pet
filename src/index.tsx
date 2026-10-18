@@ -37,15 +37,15 @@ export interface PixelPetProps {
 const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
   happy: {
     backgroundColor: '#1e1c063d',
-    borderColor: '#ffeb3b', // Amarillo
+    borderColor: '#ffeb3b',
   },
   angry: {
     backgroundColor: '#21090833',
-    borderColor: '#F04037', // Rojo
+    borderColor: '#F04037',
   },
   curious: {
     backgroundColor: '#1f341d3a',
-    borderColor: '#8BE383', // Verde
+    borderColor: '#8BE383',
   },
 };
 
@@ -57,16 +57,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   dialogStyle = {},
   emotionDialogStyles = {},
 }) => {
-  // --- ESTADOS DE LA MÁQUINA DE ESTADOS ---
   const [action, setAction] = useState<PetAction>('idle');
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
-  // Posición y orientación
   const [posX, setPosX] = useState<number>(100);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
 
-  // Mensaje formateado en JSX por emoción
   const emotionMessages: Record<PetEmotion, React.ReactNode> = {
     happy: messages?.happy || (
       <>
@@ -88,20 +85,15 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     ),
   };
 
-  // --- REFERENCIAS DE ESTADO Y TIMERS ---
   const actionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const idleCooldownRef = useRef<boolean>(false);
   const isEmotionFrozenRef = useRef<boolean>(false);
   const emotionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const walkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Registro de emociones y clics
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
 
-  // -------------------------------------------------------------
-  // HELPER: ACTIVAR EMOCIÓN CON CONTROL DE TIEMPO Y LIMPIEZA
-  // -------------------------------------------------------------
   const triggerEmotion = (emotion: PetEmotion) => {
     if (action === 'sleep') {
       setAction('idle');
@@ -121,9 +113,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }, 5000);
   };
 
-  // -------------------------------------------------------------
-  // REGLA 4: INACTIVIDAD DE MOUSE (SLEEP TRAS 1 MINUTO)
-  // -------------------------------------------------------------
   useEffect(() => {
     let inactivityTimer: NodeJS.Timeout;
 
@@ -149,9 +138,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, []);
 
-  // -------------------------------------------------------------
-  // REGLA 5: TIMER GLOBAL DE EMOCIONES (CADA 2 MINUTOS)
-  // -------------------------------------------------------------
   useEffect(() => {
     const emotionInterval = setInterval(() => {
       if (action === 'sleep') return;
@@ -168,9 +154,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, [action]);
 
-  // -------------------------------------------------------------
-  // REGLA 3 & 2: BUCLE DE ACCIONES (WALK / IDLE) Y COOLDOWN DE 30s
-  // -------------------------------------------------------------
   useEffect(() => {
     if (action === 'sleep') return;
 
@@ -206,9 +189,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, [action]);
 
-  // -------------------------------------------------------------
-  // REGLA 2: LÓGICA DE MOVIMIENTO HORIZONTAL Y BORDES DE PANTALLA
-  // -------------------------------------------------------------
   useEffect(() => {
     if (action !== 'walk' || activeEmotion !== null) {
       if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
@@ -248,9 +228,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, [action, activeEmotion, direction, size]);
 
-  // -------------------------------------------------------------
-  // REGLA 7: INTERACCIÓN POR CLICS (REACCIÓN Y SPAM DE CLICS)
-  // -------------------------------------------------------------
   const handleClick = () => {
     const now = Date.now();
 
@@ -271,9 +248,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  // -------------------------------------------------------------
-  // REGLA 6: INTERACCIÓN DE MOUSE (HOVER Y DIÁLOGO)
-  // -------------------------------------------------------------
   const handleMouseEnter = () => {
     setIsHovered(true);
     if (activeEmotion) {
@@ -298,19 +272,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return `state-${action}`;
   };
 
-  // -------------------------------------------------------------
-  // GENERACIÓN DINÁMICA DE ESTILOS SEGÚN EMOCIÓN ACTIVA
-  // -------------------------------------------------------------
   const getDialogStyle = (): CSSProperties => {
     if (!activeEmotion) return {};
 
-    // Obtener valores por defecto para la emoción actual
     const defaultEmotionConfig = DEFAULT_EMOTION_STYLES[activeEmotion] || {};
 
-    // Obtener overrides personalizados pasados por props
     const customEmotionConfig = emotionDialogStyles[activeEmotion] || {};
 
-    // Combinar propiedades
     const bgColor =
       customEmotionConfig.backgroundColor ||
       dialogStyle.backgroundColor ||
@@ -337,14 +305,12 @@ console.log('result', customEmotionConfig)
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}>
 
-      {/* Mostrar globo si hay hover Y emoción activa */}
       {isHovered && activeEmotion && (
         <div className="pixel-pet-dialog" style={getDialogStyle()}>
           {emotionMessages[activeEmotion]}
         </div>
       )}
 
-      {/* Renderizado de Sprite */}
       <div
         className={`pixel-pet-sprite ${getCurrentStateClass()} ${
           direction === 'left' ? 'flip-x' : ''

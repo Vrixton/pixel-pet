@@ -6,8 +6,8 @@ export default defineConfig({
   dts: true,
   clean: true,
   minify: true,
-  injectStyle: true, // Inyecta el CSS automáticamente al importar el paquete
+  injectStyle: true,
   loader: {
-    '.png': 'dataurl', // Convierte el sprite a Base64 para no lidiar con rutas de imágenes en proyectos ajenos
+    '.png': 'dataurl',
   },
 });

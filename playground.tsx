@@ -26,15 +26,15 @@ const App = () => {
         emotionDialogStyles={{
           happy: {
             backgroundColor: '#1e1c063d',
-            borderColor: '#ffeb3b', // Amarillo para feliz
+            borderColor: '#ffeb3b',
           },
           angry: {
             backgroundColor: '#21090833',
-            borderColor: '#F04037', // Rojo para enojado
+            borderColor: '#F04037',
           },
           curious: {
             backgroundColor: '#1f341d3a',
-            borderColor: '#8BE383', // Verde para curioso
+            borderColor: '#8BE383',
           },
         }}
       />
