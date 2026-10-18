@@ -23,6 +23,7 @@ const SPRITES: Record<PetVariant, string> = {
 export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
+  label?: string;
   size?: number;
   messages?: {
     default?: React.ReactNode;
@@ -52,6 +53,7 @@ const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
 export const PixelPet: React.FC<PixelPetProps> = ({
   petName = 'Static',
   variant = 'cat',
+  label,
   size = 60,
   messages,
   dialogStyle = {},
@@ -310,7 +312,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         </div>
       )}
 
-      <div
+      <button
+        type="button"
+        aria-label={label ?? petName}
         className={`pixel-pet-sprite ${getCurrentStateClass()} ${
           direction === 'left' ? 'flip-x' : ''
         }`}
