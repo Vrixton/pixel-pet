@@ -197,3 +197,28 @@ describe('PixelPet reduced motion', () => {
     expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('state-walk');
   });
 });
+
+describe('PixelPet walking', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('tries again when the first roll says not to walk', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValue(0.99);
+    render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).not.toHaveClass('state-walk');
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(pet).toHaveClass('state-walk');
+  });
+});
