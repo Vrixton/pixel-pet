@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PixelPet } from './index';
 
@@ -44,5 +44,52 @@ describe('PixelPet', () => {
 
     await user.keyboard('{Enter}');
     expect(pet).toHaveClass('state-happy');
+  });
+});
+
+describe('PixelPet dialog bubble', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('shows the bubble after a tap, without hover', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    expect(getDialog(container)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)).toHaveTextContent('Danko se siente feliz');
+  });
+
+  it('announces the bubble through a status region when activated with the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" />);
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('status')).toHaveTextContent('Danko se siente feliz');
+  });
+
+  it('keeps automatic emotions silent until the pet is hovered or focused', () => {
+    vi.useFakeTimers();
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    act(() => {
+      vi.advanceTimersByTime(30000);
+    });
+
+    expect(pet.className).toMatch(/state-(happy|angry|curious)/);
+    expect(getDialog(container)).not.toBeInTheDocument();
+
+    act(() => {
+      pet.focus();
+    });
+
+    expect(getDialog(container)).toBeInTheDocument();
   });
 });

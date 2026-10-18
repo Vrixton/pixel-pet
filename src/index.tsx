@@ -62,6 +62,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [action, setAction] = useState<PetAction>('idle');
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [isFocused, setIsFocused] = useState<boolean>(false);
+  const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
 
   const [posX, setPosX] = useState<number>(100);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
@@ -96,13 +98,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
 
-  const triggerEmotion = (emotion: PetEmotion) => {
+  const triggerEmotion = (emotion: PetEmotion, fromUser = false) => {
     if (action === 'sleep') {
       setAction('idle');
     }
 
     lastEmotionRef.current = emotion;
     setActiveEmotion(emotion);
+    setIsUserTriggered(fromUser);
 
     if (emotionTimerRef.current) {
       clearTimeout(emotionTimerRef.current);
@@ -244,9 +247,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     if (recentClicks.length > 5) {
       clickTimestampsRef.current = [];
-      triggerEmotion('angry');
+      triggerEmotion('angry', true);
     } else {
-      triggerEmotion(lastEmotionRef.current);
+      triggerEmotion(lastEmotionRef.current, true);
     }
   };
 
@@ -306,11 +309,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}>
 
-      {isHovered && activeEmotion && (
-        <div className="pixel-pet-dialog" style={getDialogStyle()}>
-          {emotionMessages[activeEmotion]}
-        </div>
-      )}
+      <div className="pixel-pet-status" role="status">
+        {activeEmotion && (isHovered || isFocused || isUserTriggered) && (
+          <div className="pixel-pet-dialog" style={getDialogStyle()}>
+            {emotionMessages[activeEmotion]}
+          </div>
+        )}
+      </div>
 
       <button
         type="button"
@@ -322,6 +327,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           backgroundImage: `url(${SPRITES[variant]})`,
         }}
         onClick={handleClick}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
       />
     </div>
   );
