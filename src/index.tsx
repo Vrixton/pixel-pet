@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, CSSProperties } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore, CSSProperties } from 'react';
 import catSprite from './cat-sprite.png';
 import dogSprite from './dog-sprite.png';
 import './styles.css';
@@ -22,6 +22,22 @@ const SPRITES: Record<PetVariant, string> = {
 };
 
 const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+const subscribeToReducedMotion = (onChange: () => void) => {
+  if (typeof window.matchMedia !== 'function') return () => {};
+  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+  mediaQuery.addEventListener('change', onChange);
+  return () => mediaQuery.removeEventListener('change', onChange);
+};
+
+const getPrefersReducedMotion = () =>
+  typeof window.matchMedia === 'function' && window.matchMedia(REDUCED_MOTION_QUERY).matches;
+
+const usePrefersReducedMotion = () =>
+  useSyncExternalStore(subscribeToReducedMotion, getPrefersReducedMotion, () => false);
+
 export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
@@ -62,6 +78,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   emotionDialogStyles = {},
 }) => {
   const [action, setAction] = useState<PetAction>('idle');
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
@@ -170,7 +187,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     const decideNextAction = () => {
       if (action === 'idle' && !idleCooldownRef.current) {
-        if (Math.random() > 0.4) {
+        if (!prefersReducedMotion && Math.random() > 0.4) {
           setAction('walk');
 
           const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
@@ -198,10 +215,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
-  }, [action]);
+  }, [action, prefersReducedMotion]);
 
   useEffect(() => {
-    if (action !== 'walk' || activeEmotion !== null) {
+    if (action !== 'walk' || activeEmotion !== null || prefersReducedMotion) {
       if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
       return;
     }
@@ -237,7 +254,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
     };
-  }, [action, activeEmotion, direction, size]);
+  }, [action, activeEmotion, direction, size, prefersReducedMotion]);
 
   const handleClick = () => {
     const now = Date.now();
@@ -280,6 +297,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const getCurrentStateClass = () => {
     if (activeEmotion) return `state-${activeEmotion}`;
+    if (prefersReducedMotion && action === 'walk') return 'state-idle';
     return `state-${action}`;
   };
 

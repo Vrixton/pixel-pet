@@ -154,3 +154,46 @@ describe('PixelPet sleep', () => {
     expect(pet).not.toHaveClass('state-sleep');
   });
 });
+
+describe('PixelPet reduced motion', () => {
+  const mockReducedMotion = (matches: boolean) => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('walks when the user has no motion preference', () => {
+    mockReducedMotion(false);
+    render(<PixelPet petName="Danko" />);
+
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('state-walk');
+  });
+
+  it('stays in place when the user prefers reduced motion', () => {
+    mockReducedMotion(true);
+    render(<PixelPet petName="Danko" />);
+
+    act(() => {
+      vi.advanceTimersByTime(20000);
+    });
+
+    expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('state-walk');
+  });
+});
