@@ -85,11 +85,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     ),
   };
 
-  const actionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleCooldownRef = useRef<boolean>(false);
   const isEmotionFrozenRef = useRef<boolean>(false);
-  const emotionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const walkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const emotionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const walkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
@@ -114,7 +114,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   useEffect(() => {
-    let inactivityTimer: NodeJS.Timeout;
+    let inactivityTimer: ReturnType<typeof setTimeout>;
 
     const resetInactivity = () => {
       setAction((prevAction) => {
