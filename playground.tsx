@@ -9,17 +9,18 @@ interface GardenPet {
   species: string;
   spriteSrc?: string;
   name: string;
+  color: string;
 }
 
 const PETS: GardenPet[] = [
-  { variant: 'cat', species: 'Cat', name: 'Static' },
-  { variant: 'dog', species: 'Dog', name: 'Danko' },
-  { variant: 'axolotl', species: 'Axolotl', name: 'Momo' },
-  { variant: 'parakeet', species: 'Parakeet', name: 'Kiwi' },
-  { variant: 'hamster', species: 'Hamster', name: 'Nugget' },
+  { variant: 'cat', species: 'Cat', name: 'Static', color: '#F8C38E' },
+  { variant: 'dog', species: 'Dog', name: 'Danko', color: '#D9925A' },
+  { variant: 'axolotl', species: 'Axolotl', name: 'Momo', color: '#F07A9C' },
+  { variant: 'parakeet', species: 'Parakeet', name: 'Kiwi', color: '#B8A6F5' },
+  { variant: 'hamster', species: 'Hamster', name: 'Nugget', color: '#F2C14E' },
 ];
 
-const Plot = ({ variant, species, name }: GardenPet) => {
+const Plot = ({ variant, species, name, color }: GardenPet) => {
   const pet = useRef<PixelPetHandle>(null);
 
   return (
@@ -27,12 +28,21 @@ const Plot = ({ variant, species, name }: GardenPet) => {
       <div className="sign">
         <h2 id={`plot-${variant}`}>{species}</h2>
         <code>variant="{variant}"</code>
-        <button type="button" onClick={() => pet.current?.say(`Hi, I'm ${name}!`)}>
+        <button
+          type="button"
+          onClick={() =>
+            pet.current?.say(
+              <>
+                Hi, I'm <span className="pixel-pet-highlight-pet">{name}</span>!
+              </>,
+            )
+          }
+        >
           Say hi
         </button>
       </div>
       <div className="path">
-        <PixelPet ref={pet} petName={name} variant={variant} />
+        <PixelPet ref={pet} petName={name} variant={variant} color={color} />
       </div>
     </section>
   );
