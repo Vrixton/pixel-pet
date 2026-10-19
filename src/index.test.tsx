@@ -993,3 +993,107 @@ describe('PixelPet message markers', () => {
     expect(container.querySelector('.pixel-pet-dialog em')).toHaveTextContent('{name}');
   });
 });
+
+describe('PixelPet showcase mode', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('stays idle instead of walking', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    render(<PixelPet petName="Danko" mode="showcase" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(20000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+  });
+
+  it('shows no automatic emotions, even on hover', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" mode="showcase" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(30000);
+    fireEvent.mouseEnter(pet.parentElement!);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('says its name on click while staying idle, then hides it after three seconds', () => {
+    const { container } = render(<PixelPet petName="Danko" mode="showcase" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    clickWithMouse(pet);
+
+    expect(getDialog(container)).toHaveTextContent("Hi, I'm Danko!");
+    expect(container.querySelector('.pixel-pet-dialog .pixel-pet-highlight-pet')).toHaveTextContent('Danko');
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+
+    advance(2900);
+
+    expect(getDialog(container)).toBeInTheDocument();
+
+    advance(100);
+
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('uses the greeting message passed in, for example in another language', () => {
+    const { container } = render(
+      <PixelPet petName="Danko" mode="showcase" messages={{ greeting: '¡Hola, soy {name}!' }} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)).toHaveTextContent('¡Hola, soy Danko!');
+  });
+
+  it('does not get angry after many clicks', () => {
+    const { container } = render(<PixelPet petName="Danko" mode="showcase" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let click = 0; click < 8; click += 1) fireEvent.click(pet);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(getDialog(container)).toHaveTextContent("Hi, I'm Danko!");
+  });
+
+  it('falls asleep after two minutes and wakes up to say its name', () => {
+    const { container } = render(<PixelPet petName="Danko" mode="showcase" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(120000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+    fireEvent.click(pet);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(getDialog(container)).toHaveTextContent("Hi, I'm Danko!");
+  });
+
+  it('skips the greeting when onClick prevents the default', () => {
+    const { container } = render(
+      <PixelPet petName="Danko" mode="showcase" onClick={(event) => event.preventDefault()} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+});

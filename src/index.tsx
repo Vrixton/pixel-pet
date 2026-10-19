@@ -21,7 +21,8 @@ export interface DialogStyleProps {
 export type PetEmotion = 'happy' | 'angry' | 'curious';
 export type PetAction = 'idle' | 'walk' | 'sleep';
 export type PetVariant = 'cat' | 'dog' | 'axolotl' | 'parakeet' | 'hamster';
-export type PetMessages = Partial<Record<PetEmotion, React.ReactNode>>;
+export type PetMode = 'live' | 'showcase';
+export type PetMessages = Partial<Record<PetEmotion | 'greeting', React.ReactNode>>;
 
 export interface PetSayOptions {
   emotion?: PetEmotion;
@@ -48,6 +49,7 @@ const DEFAULT_MESSAGES: Record<PetEmotion, string> = {
   angry: '{name} is feeling **overwhelmed**!',
   curious: '{name} is very **curious**',
 };
+const DEFAULT_GREETING = "Hi, I'm {name}!";
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
@@ -72,6 +74,7 @@ export interface PixelPetProps {
   spriteSrc?: string;
   color?: string;
   label?: string;
+  mode?: PetMode;
   walk?: boolean;
   messages?: PetMessages;
   dialogStyle?: DialogStyleProps;
@@ -106,6 +109,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   spriteSrc,
   color,
   label,
+  mode = 'live',
   walk = true,
   messages,
   dialogStyle = {},
@@ -115,7 +119,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 }) => {
   const [action, setAction] = useState<PetAction>('idle');
   const prefersReducedMotion = usePrefersReducedMotion();
-  const canWalk = walk && !prefersReducedMotion;
+  const isShowcase = mode === 'showcase';
+  const canWalk = walk && !prefersReducedMotion && !isShowcase;
   const stageRef = useRef<HTMLDivElement>(null);
   const walkerRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -259,6 +264,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, [action]);
 
   useEffect(() => {
+    if (isShowcase) return;
+
     const emotionInterval = setInterval(() => {
       if (actionRef.current === 'sleep' || isSpeakingRef.current) return;
 
@@ -271,7 +278,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       clearInterval(emotionInterval);
     };
-  }, []);
+  }, [isShowcase]);
 
   useEffect(() => {
     return () => {
@@ -388,6 +395,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       setAction('idle');
     }
 
+    if (isShowcase) {
+      updateSpeech({ message: messages?.greeting ?? DEFAULT_GREETING, emotion: null });
+      speechDurationRef.current = CLICK_BUBBLE_DURATION;
+      scheduleSpeechEnd(CLICK_BUBBLE_DURATION);
+      return;
+    }
+
     if (isSpeakingRef.current) {
       clearSpeechTimer();
       updateSpeech(null);
@@ -434,7 +448,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   const isSpeaking = speech !== null && action !== 'sleep';
-  const visibleEmotion = action === 'sleep' ? null : isSpeaking ? speech.emotion : activeEmotion;
+  const visibleEmotion =
+    action === 'sleep' ? null : isSpeaking ? speech.emotion : isShowcase ? null : activeEmotion;
   const isDialogVisible =
     isSpeaking ||
     (visibleEmotion !== null && ((isHovered && !isHoverMuted) || isFocused || isUserTriggered));
