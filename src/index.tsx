@@ -57,7 +57,6 @@ export interface PixelPetProps {
   variant?: PetVariant;
   label?: string;
   walk?: boolean;
-  size?: number;
   messages?: {
     default?: React.ReactNode;
     happy?: React.ReactNode;
@@ -88,7 +87,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   variant = 'cat',
   label,
   walk = true,
-  size = 60,
   messages,
   dialogStyle = {},
   emotionDialogStyles = {},
@@ -254,7 +252,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     if (action !== 'walk' || activeEmotion !== null || !canWalk) return;
 
     const minBoundary = 0;
-    const maxBoundary = stageWidth - Math.max(size, SPRITE_MAX_WIDTH);
+    const maxBoundary = stageWidth - SPRITE_MAX_WIDTH;
     if (maxBoundary <= minBoundary) return;
 
     let frameId = 0;
@@ -287,7 +285,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     frameId = requestAnimationFrame(step);
 
     return () => cancelAnimationFrame(frameId);
-  }, [action, activeEmotion, direction, size, canWalk, stageWidth]);
+  }, [action, activeEmotion, direction, canWalk, stageWidth]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -295,9 +293,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     const updateStageWidth = (width: number) => {
       setStageWidth(width);
-      applyPosition(
-        Math.max(Math.min(posXRef.current, width - Math.max(size, SPRITE_MAX_WIDTH)), 0),
-      );
+      applyPosition(Math.max(Math.min(posXRef.current, width - SPRITE_MAX_WIDTH), 0));
     };
 
     updateStageWidth(stage.clientWidth);
@@ -310,7 +306,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     observer.observe(stage);
 
     return () => observer.disconnect();
-  }, [size]);
+  }, []);
 
   const handleClick = () => {
     const now = Date.now();
