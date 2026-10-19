@@ -6,7 +6,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   minify: true,
-  injectStyle: true,
   loader: {
     '.png': 'dataurl',
   },
