@@ -87,6 +87,18 @@
   background-image: url('./sprites/dog-sprite.png');
 }
 
+.pixel-pet-axolotl {
+  background-image: url('./sprites/axolotl-sprite.png');
+}
+
+.pixel-pet-parakeet {
+  background-image: url('./sprites/parakeet-sprite.png');
+}
+
+.pixel-pet-hamster {
+  background-image: url('./sprites/hamster-sprite.png');
+}
+
 .pixel-pet-sprite:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;

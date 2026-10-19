@@ -20,7 +20,7 @@ export interface DialogStyleProps {
 
 export type PetEmotion = 'happy' | 'angry' | 'curious';
 export type PetAction = 'idle' | 'walk' | 'sleep';
-export type PetVariant = 'cat' | 'dog';
+export type PetVariant = 'cat' | 'dog' | 'axolotl' | 'parakeet' | 'hamster';
 export type PetMessages = Partial<Record<PetEmotion, React.ReactNode>>;
 
 export interface PetSayOptions {

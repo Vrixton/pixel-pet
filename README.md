@@ -1,6 +1,6 @@
 # PixelPet
 
-A pixel art cat or dog for React. It walks along the bottom of its container, falls asleep when nobody's around, reacts to clicks, changes its mood over time, and can speak on demand.
+A pixel art pet for React: a cat, a dog, an axolotl, a parakeet, or a hamster. It walks along the bottom of its container, falls asleep when nobody's around, reacts to clicks, changes its mood over time, and can speak on demand.
 
 It was built for the handheld-console interface of [V-DEX](https://v-dex.vercel.app), where it lives inside the device's screen.
 
@@ -69,7 +69,7 @@ The message shows right away, without hovering, and screen readers announce it. 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `petName` | `string` | `'Static'` | The name shown in the mood messages. |
-| `variant` | `'cat' \| 'dog'` | `'cat'` | Which of the bundled sprites to use. |
+| `variant` | `'cat' \| 'dog' \| 'axolotl' \| 'parakeet' \| 'hamster'` | `'cat'` | Which of the bundled sprites to use. |
 | `spriteSrc` | `string` | none | A URL for your own sprite sheet. It takes priority over `variant`. |
 | `label` | `string` | `petName` | The accessible name of the pet's button. |
 | `walk` | `boolean` | `true` | Set it to `false` to keep the pet in place. |
@@ -117,7 +117,7 @@ A field set in `emotionDialogStyles` wins over the same field in `dialogStyle`, 
 
 ## Custom sprites
 
-A sheet passed through `spriteSrc` has to follow the same layout as the bundled ones, [cat-sprite.png](src/sprites/cat-sprite.png) and [dog-sprite.png](src/sprites/dog-sprite.png): one row per animation, in the order idle, walk, happy, sleep, angry, and curious, with nine frames per row.
+A sheet passed through `spriteSrc` has to follow the same layout as the bundled ones in [src/sprites](src/sprites): one row per animation, in the order idle, walk, happy, sleep, angry, and curious, with nine frames per row.
 
 ## How it behaves
 

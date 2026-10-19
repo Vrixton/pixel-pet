@@ -25,6 +25,14 @@ describe('PixelPet', () => {
     expect(getComputedStyle(sprite!).backgroundImage).toContain('dog-sprite');
   });
 
+  it.each(['axolotl', 'parakeet', 'hamster'] as const)('renders the %s sprite for its variant', (variant) => {
+    const { container } = render(<PixelPet variant={variant} />);
+    const sprite = getSprite(container);
+
+    expect(sprite).toHaveClass(`pixel-pet-${variant}`);
+    expect(getComputedStyle(sprite!).backgroundImage).toContain(`${variant}-sprite`);
+  });
+
   it('loads the variant sprite from the stylesheet instead of an inline style', () => {
     const { container } = render(<PixelPet variant="dog" />);
 
