@@ -62,7 +62,7 @@ The message shows right away, without hovering, and screen readers announce it. 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `emotion` | `'happy' \| 'angry' \| 'curious'` | none | Plays that emotion's animation and colors the bubble to match. Without it, the bubble is neutral. |
-| `duration` | `number` | `5000` | How long the message stays, in milliseconds. |
+| `duration` | `number` | `5000` | How long the message stays, in milliseconds. Pass `Infinity` to keep it until a new message replaces it, the user taps the pet, or the pet falls asleep. |
 
 ## Props
 

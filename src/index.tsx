@@ -186,6 +186,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const scheduleSpeechEnd = (duration: number) => {
     clearSpeechTimer();
+    if (duration === Infinity) return;
     speechTimerRef.current = setTimeout(() => updateSpeech(null), duration);
   };
 

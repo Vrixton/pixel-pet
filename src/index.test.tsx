@@ -681,6 +681,23 @@ describe('PixelPet say()', () => {
     expect(getDialog(container)).not.toBeInTheDocument();
   });
 
+  it('keeps an endless message until the pet is tapped', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say, pet } = renderWithHandle();
+
+    say('Ask me anything.', { duration: Infinity });
+    advance(50000);
+    fireEvent.mouseEnter(pet.parentElement!);
+    fireEvent.mouseLeave(pet.parentElement!);
+    advance(50000);
+
+    expect(getDialog(container)).toHaveTextContent('Ask me anything.');
+
+    fireEvent.click(pet);
+
+    expect(getDialog(container)).not.toHaveTextContent('Ask me anything.');
+  });
+
   it('wakes the pet up to speak', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const { container, say, pet } = renderWithHandle();
