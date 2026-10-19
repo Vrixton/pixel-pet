@@ -30,6 +30,7 @@ export interface PetSayOptions {
 
 export interface PixelPetHandle {
   say: (message: React.ReactNode, options?: PetSayOptions) => void;
+  hush: () => void;
 }
 
 const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
@@ -198,6 +199,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         updateSpeech({ message, emotion: options.emotion ?? null });
         speechDurationRef.current = options.duration ?? DEFAULT_SPEECH_DURATION;
         scheduleSpeechEnd(speechDurationRef.current);
+      },
+      hush: () => {
+        clearSpeechTimer();
+        updateSpeech(null);
       },
     }),
     [],

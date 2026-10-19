@@ -698,6 +698,22 @@ describe('PixelPet say()', () => {
     expect(getDialog(container)).not.toHaveTextContent('Ask me anything.');
   });
 
+  it('closes the current message on hush()', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    act(() => {
+      handle.current?.say('Ask me anything.', { duration: Infinity });
+    });
+    act(() => {
+      handle.current?.hush();
+    });
+
+    expect(getDialog(container)).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
   it('wakes the pet up to speak', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const { container, say, pet } = renderWithHandle();
