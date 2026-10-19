@@ -13,14 +13,22 @@ describe('PixelPet', () => {
     const { container } = render(<PixelPet />);
     const sprite = getSprite(container);
 
-    expect(sprite).toBeInTheDocument();
-    expect(sprite?.style.backgroundImage).toContain('cat-sprite');
+    expect(sprite).toHaveClass('pixel-pet-cat');
+    expect(getComputedStyle(sprite!).backgroundImage).toContain('cat-sprite');
   });
 
   it('renders the dog sprite when the variant is dog', () => {
     const { container } = render(<PixelPet variant="dog" />);
+    const sprite = getSprite(container);
 
-    expect(getSprite(container)?.style.backgroundImage).toContain('dog-sprite');
+    expect(sprite).toHaveClass('pixel-pet-dog');
+    expect(getComputedStyle(sprite!).backgroundImage).toContain('dog-sprite');
+  });
+
+  it('loads the variant sprite from the stylesheet instead of an inline style', () => {
+    const { container } = render(<PixelPet variant="dog" />);
+
+    expect(getSprite(container)?.getAttribute('style')).toBeNull();
   });
 
   it('uses spriteSrc instead of the variant sprite when provided', () => {
@@ -28,7 +36,7 @@ describe('PixelPet', () => {
     const backgroundImage = getSprite(container)?.style.backgroundImage;
 
     expect(backgroundImage).toContain('/pets/danko.png');
-    expect(backgroundImage).not.toContain('dog-sprite');
+    expect(getComputedStyle(getSprite(container)!).backgroundImage).toContain('/pets/danko.png');
   });
 
   it('keeps a spriteSrc with spaces and parentheses intact', () => {

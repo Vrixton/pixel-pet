@@ -79,6 +79,14 @@
   filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.6)) saturate(140%);
 }
 
+.pixel-pet-cat {
+  background-image: url('./cat-sprite.png');
+}
+
+.pixel-pet-dog {
+  background-image: url('./dog-sprite.png');
+}
+
 .pixel-pet-sprite:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;

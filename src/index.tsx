@@ -7,8 +7,6 @@ import React, {
   useSyncExternalStore,
   CSSProperties,
 } from 'react';
-import catSprite from './cat-sprite.png';
-import dogSprite from './dog-sprite.png';
 import './styles.css';
 
 export interface DialogStyleProps {
@@ -33,11 +31,6 @@ export interface PetSayOptions {
 export interface PixelPetHandle {
   say: (message: React.ReactNode, options?: PetSayOptions) => void;
 }
-
-const SPRITES: Record<PetVariant, string> = {
-  cat: catSprite,
-  dog: dogSprite,
-};
 
 const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
 
@@ -488,12 +481,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         <button
           type="button"
           aria-label={label ?? petName}
-          className={`pixel-pet-sprite ${getCurrentStateClass()} ${
+          className={`pixel-pet-sprite pixel-pet-${variant} ${getCurrentStateClass()} ${
             direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}
-          style={{
-            backgroundImage: `url("${spriteSrc ?? SPRITES[variant]}")`,
-          }}
+          style={spriteSrc ? { backgroundImage: `url("${spriteSrc}")` } : undefined}
           onClick={handleClick}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}

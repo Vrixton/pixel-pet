@@ -7,6 +7,6 @@ export default defineConfig({
   clean: true,
   minify: true,
   loader: {
-    '.png': 'dataurl',
+    '.png': 'file',
   },
 });
