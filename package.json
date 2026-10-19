@@ -29,7 +29,8 @@
     "dev": "tsup --watch",
     "playground": "vite",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm test && pnpm build"
   },
   "peerDependencies": {
     "react": "^19"
