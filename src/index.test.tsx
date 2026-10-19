@@ -1,9 +1,9 @@
-import { Profiler } from 'react';
+import { Profiler, createRef } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PixelPet } from './index';
+import { PixelPet, type PixelPetHandle } from './index';
 
 const getSprite = (container: HTMLElement) =>
   container.querySelector<HTMLElement>('.pixel-pet-sprite');
@@ -581,5 +581,124 @@ describe('PixelPet messages', () => {
     expect(pet).toHaveClass('state-angry');
     expect(getDialog(container)).toHaveTextContent('Danko is feeling overwhelmed!');
     vi.useRealTimers();
+  });
+});
+
+describe('PixelPet say()', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const renderWithHandle = () => {
+    const handle = createRef<PixelPetHandle>();
+    const view = render(<PixelPet petName="Danko" ref={handle} />);
+    const say = (...args: Parameters<PixelPetHandle['say']>) => {
+      act(() => {
+        handle.current?.say(...args);
+      });
+    };
+    return { ...view, say, pet: screen.getByRole('button', { name: 'Danko' }) };
+  };
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('shows and announces a message without hover, then hides it after five seconds', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say } = renderWithHandle();
+
+    say('Press the center button.');
+
+    expect(getDialog(container)).toHaveTextContent('Press the center button.');
+    expect(screen.getByRole('status')).toHaveTextContent('Press the center button.');
+
+    advance(5000);
+
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('shows the requested emotion while speaking', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say, pet } = renderWithHandle();
+
+    say('What is this?', { emotion: 'curious' });
+
+    expect(pet).toHaveClass('state-curious');
+    expect(getDialog(container)).toHaveTextContent('What is this?');
+  });
+
+  it('keeps the message for the requested duration', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say } = renderWithHandle();
+
+    say('A longer hint.', { duration: 8000 });
+    advance(7000);
+
+    expect(getDialog(container)).toHaveTextContent('A longer hint.');
+
+    advance(1000);
+
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('wakes the pet up to speak', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say, pet } = renderWithHandle();
+
+    advance(1000);
+    fireEvent.pointerMove(window);
+    advance(120000);
+    expect(pet).toHaveClass('state-sleep');
+
+    say('Wake up!');
+
+    expect(pet).not.toHaveClass('state-sleep');
+    expect(getDialog(container)).toHaveTextContent('Wake up!');
+  });
+
+  it('stops walking while speaking', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container, say, pet } = renderWithHandle();
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+
+    advance(500);
+    say('Hold on.');
+    const transformWhileSpeaking = walker?.style.transform;
+    advance(2000);
+
+    expect(pet).toHaveClass('state-idle');
+    expect(walker?.style.transform).toBe(transformWhileSpeaking);
+  });
+
+  it('is not interrupted by an automatic emotion', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say } = renderWithHandle();
+
+    advance(29000);
+    say('Still talking.');
+    advance(2000);
+
+    expect(getDialog(container)).toHaveTextContent('Still talking.');
+  });
+
+  it('gives way to the user when they tap the pet', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container, say, pet } = renderWithHandle();
+
+    say('Hello there.');
+    fireEvent.click(pet);
+
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
   });
 });

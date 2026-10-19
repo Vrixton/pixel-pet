@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   useSyncExternalStore,
@@ -24,6 +25,15 @@ export type PetAction = 'idle' | 'walk' | 'sleep';
 export type PetVariant = 'cat' | 'dog';
 export type PetMessages = Partial<Record<PetEmotion, React.ReactNode>>;
 
+export interface PetSayOptions {
+  emotion?: PetEmotion;
+  duration?: number;
+}
+
+export interface PixelPetHandle {
+  say: (message: React.ReactNode, options?: PetSayOptions) => void;
+}
+
 const SPRITES: Record<PetVariant, string> = {
   cat: catSprite,
   dog: dogSprite,
@@ -35,6 +45,7 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 const DIALOG_EDGE_GAP = 4;
 const DIALOG_MAX_WIDTH = 240;
+const DEFAULT_SPEECH_DURATION = 5000;
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
@@ -61,6 +72,7 @@ export interface PixelPetProps {
   messages?: PetMessages;
   dialogStyle?: DialogStyleProps;
   emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
+  ref?: React.Ref<PixelPetHandle>;
 }
 
 const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
@@ -78,6 +90,11 @@ const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
   },
 };
 
+const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
+  backgroundColor: '#05080cd9',
+  borderColor: '#FDDBA0',
+};
+
 export const PixelPet: React.FC<PixelPetProps> = ({
   petName = 'Static',
   variant = 'cat',
@@ -86,6 +103,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   messages,
   dialogStyle = {},
   emotionDialogStyles = {},
+  ref,
 }) => {
   const [action, setAction] = useState<PetAction>('idle');
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -98,6 +116,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
+  const [speech, setSpeech] = useState<{ message: React.ReactNode; emotion: PetEmotion | null } | null>(
+    null,
+  );
 
   const posXRef = useRef<number>(INITIAL_POSITION);
   const [stageWidth, setStageWidth] = useState<number>(0);
@@ -133,6 +154,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
 
+  const isSpeakingRef = useRef<boolean>(false);
+  const speechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechDurationRef = useRef<number>(DEFAULT_SPEECH_DURATION);
+
   const triggerEmotion = (emotion: PetEmotion, fromUser = false) => {
     if (action === 'sleep') {
       setAction('idle');
@@ -153,6 +178,33 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }, 5000);
   };
 
+  const updateSpeech = (value: { message: React.ReactNode; emotion: PetEmotion | null } | null) => {
+    isSpeakingRef.current = value !== null;
+    setSpeech(value);
+  };
+
+  const clearSpeechTimer = () => {
+    if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
+  };
+
+  const scheduleSpeechEnd = (duration: number) => {
+    clearSpeechTimer();
+    speechTimerRef.current = setTimeout(() => updateSpeech(null), duration);
+  };
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      say: (message, options = {}) => {
+        setAction((prevAction) => (prevAction === 'sleep' ? 'idle' : prevAction));
+        updateSpeech({ message, emotion: options.emotion ?? null });
+        speechDurationRef.current = options.duration ?? DEFAULT_SPEECH_DURATION;
+        scheduleSpeechEnd(speechDurationRef.current);
+      },
+    }),
+    [],
+  );
+
   useEffect(() => {
     let inactivityTimer: ReturnType<typeof setTimeout>;
 
@@ -165,6 +217,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       clearTimeout(inactivityTimer);
       inactivityTimer = setTimeout(() => {
         setActiveEmotion(null);
+        updateSpeech(null);
         setAction('sleep');
       }, 120000);
     };
@@ -188,7 +241,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   useEffect(() => {
     const emotionInterval = setInterval(() => {
-      if (actionRef.current === 'sleep') return;
+      if (actionRef.current === 'sleep' || isSpeakingRef.current) return;
 
       const emotions: PetEmotion[] = ['happy', 'angry', 'curious'];
       const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -204,6 +257,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   useEffect(() => {
     return () => {
       if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
+      if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
     };
   }, []);
 
@@ -245,7 +299,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   useEffect(() => {
-    if (action !== 'walk' || activeEmotion !== null || !canWalk) return;
+    if (action !== 'walk' || activeEmotion !== null || speech !== null || !canWalk) return;
 
     const minBoundary = 0;
     const maxBoundary = stageWidth - SPRITE_MAX_WIDTH;
@@ -281,7 +335,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     frameId = requestAnimationFrame(step);
 
     return () => cancelAnimationFrame(frameId);
-  }, [action, activeEmotion, direction, canWalk, stageWidth]);
+  }, [action, activeEmotion, speech, direction, canWalk, stageWidth]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -311,6 +365,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       setAction('idle');
     }
 
+    if (isSpeakingRef.current) {
+      clearSpeechTimer();
+      updateSpeech(null);
+    }
+
     const recentClicks = [...clickTimestampsRef.current, now].filter(
       (timestamp) => now - timestamp <= 10000
     );
@@ -326,6 +385,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const handleMouseEnter = () => {
     setIsHovered(true);
+    if (isSpeakingRef.current) clearSpeechTimer();
     if (activeEmotion) {
       isEmotionFrozenRef.current = true;
       if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
@@ -334,6 +394,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    if (isSpeakingRef.current) scheduleSpeechEnd(speechDurationRef.current);
     if (activeEmotion) {
       isEmotionFrozenRef.current = false;
       if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
@@ -343,8 +404,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  const visibleEmotion = action === 'sleep' ? null : activeEmotion;
-  const isDialogVisible = visibleEmotion !== null && (isHovered || isFocused || isUserTriggered);
+  const isSpeaking = speech !== null && action !== 'sleep';
+  const visibleEmotion = action === 'sleep' ? null : isSpeaking ? speech.emotion : activeEmotion;
+  const isDialogVisible =
+    isSpeaking || (visibleEmotion !== null && (isHovered || isFocused || isUserTriggered));
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -362,20 +425,18 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const left = Math.max(Math.min(centeredLeft, maxLeft), minLeft);
 
     setDialogPlacement({ left: left - posXRef.current, maxWidth });
-  }, [isDialogVisible, visibleEmotion, stageWidth]);
+  }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
 
   const getCurrentStateClass = () => {
     if (visibleEmotion) return `state-${visibleEmotion}`;
-    if (!canWalk && action === 'walk') return 'state-idle';
+    if ((!canWalk || isSpeaking) && action === 'walk') return 'state-idle';
     return `state-${action}`;
   };
 
-  const getDialogStyle = (): CSSProperties => {
-    if (!activeEmotion) return {};
+  const getDialogStyle = (emotion: PetEmotion | null): CSSProperties => {
+    const defaultEmotionConfig = emotion ? DEFAULT_EMOTION_STYLES[emotion] : DEFAULT_SPEECH_STYLE;
 
-    const defaultEmotionConfig = DEFAULT_EMOTION_STYLES[activeEmotion] || {};
-
-    const customEmotionConfig = emotionDialogStyles[activeEmotion] || {};
+    const customEmotionConfig = (emotion && emotionDialogStyles[emotion]) || {};
 
     const bgColor =
       customEmotionConfig.backgroundColor ||
@@ -405,19 +466,19 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         onMouseLeave={handleMouseLeave}>
 
         <div className="pixel-pet-status" role="status">
-          {isDialogVisible && visibleEmotion && (
+          {isDialogVisible && (
             <div
               ref={dialogRef}
               className="pixel-pet-dialog"
               style={{
-                ...getDialogStyle(),
+                ...getDialogStyle(visibleEmotion),
                 ...(dialogPlacement && {
                   left: dialogPlacement.left,
                   maxWidth: dialogPlacement.maxWidth,
                 }),
               }}
             >
-              {emotionMessages[visibleEmotion]}
+              {isSpeaking ? speech.message : visibleEmotion && emotionMessages[visibleEmotion]}
             </div>
           )}
         </div>
