@@ -812,3 +812,41 @@ describe('PixelPet color', () => {
     expect(dialog?.style.border).toBe('1px solid rgb(18, 52, 86)');
   });
 });
+
+describe('PixelPet onClick', () => {
+  it('calls onClick when the pet is clicked or activated with the keyboard', async () => {
+    const user = userEvent.setup();
+    const handleClick = vi.fn();
+    render(<PixelPet petName="Danko" onClick={handleClick} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.click(pet);
+    pet.focus();
+    await user.keyboard('{Enter}');
+
+    expect(handleClick).toHaveBeenCalledTimes(2);
+    expect(handleClick.mock.calls[0][0].target).toBe(pet);
+  });
+
+  it('still reacts with its emotion after calling onClick', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<PixelPet petName="Danko" onClick={() => {}} />);
+
+    await user.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling happy!');
+  });
+
+  it('skips its own reaction when onClick prevents the default', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <PixelPet petName="Danko" onClick={(event) => event.preventDefault()} />,
+    );
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.click(pet);
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+    expect(pet).not.toHaveClass('pixel-pet-state-happy');
+  });
+});

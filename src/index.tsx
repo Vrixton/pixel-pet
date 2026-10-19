@@ -68,6 +68,7 @@ export interface PixelPetProps {
   messages?: PetMessages;
   dialogStyle?: DialogStyleProps;
   emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   ref?: React.Ref<PixelPetHandle>;
 }
 
@@ -101,6 +102,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   messages,
   dialogStyle = {},
   emotionDialogStyles = {},
+  onClick,
   ref,
 }) => {
   const [action, setAction] = useState<PetAction>('idle');
@@ -361,7 +363,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const handleClick = () => {
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onClick?.(event);
+    if (event.defaultPrevented) return;
+
     const now = Date.now();
 
     if (action === 'sleep') {

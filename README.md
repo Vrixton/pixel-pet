@@ -79,7 +79,8 @@ Call `pet.current?.hush()` to close the current message right away, for example 
 | `messages` | `PetMessages` | English messages | Replaces the text shown for each emotion. |
 | `dialogStyle` | `DialogStyleProps` | none | Styles for every bubble. |
 | `emotionDialogStyles` | `Partial<Record<PetEmotion, DialogStyleProps>>` | none | Styles for the bubble of a single emotion. |
-| `ref` | `Ref<PixelPetHandle>` | none | Gives you the `say()` method. |
+| `onClick` | `(event) => void` | none | Called when the user clicks or taps the pet. Call `event.preventDefault()` inside it to skip the pet's own reaction. |
+| `ref` | `Ref<PixelPetHandle>` | none | Gives you the `say()` and `hush()` methods. |
 
 ## Reusing a configuration
 
