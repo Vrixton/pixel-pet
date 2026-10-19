@@ -80,11 +80,11 @@
 }
 
 .pixel-pet-cat {
-  background-image: url('./cat-sprite.png');
+  background-image: url('./sprites/cat-sprite.png');
 }
 
 .pixel-pet-dog {
-  background-image: url('./dog-sprite.png');
+  background-image: url('./sprites/dog-sprite.png');
 }
 
 .pixel-pet-sprite:focus-visible {

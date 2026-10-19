@@ -117,7 +117,7 @@ A field set in `emotionDialogStyles` wins over the same field in `dialogStyle`, 
 
 ## Custom sprites
 
-A sheet passed through `spriteSrc` has to follow the same layout as the bundled ones, [cat-sprite.png](src/cat-sprite.png) and [dog-sprite.png](src/dog-sprite.png): one row per animation, in the order idle, walk, happy, sleep, angry, and curious, with nine frames per row.
+A sheet passed through `spriteSrc` has to follow the same layout as the bundled ones, [cat-sprite.png](src/sprites/cat-sprite.png) and [dog-sprite.png](src/sprites/dog-sprite.png): one row per animation, in the order idle, walk, happy, sleep, angry, and curious, with nine frames per row.
 
 ## How it behaves
 
