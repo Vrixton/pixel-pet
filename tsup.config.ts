@@ -6,6 +6,9 @@ export default defineConfig({
   dts: true,
   clean: true,
   minify: true,
+  banner: {
+    js: "'use client';",
+  },
   loader: {
     '.png': 'file',
   },
