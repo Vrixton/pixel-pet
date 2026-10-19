@@ -28,16 +28,7 @@ const Plot = ({ variant, species, name, color }: GardenPet) => {
       <div className="sign">
         <h2 id={`plot-${variant}`}>{species}</h2>
         <code>variant="{variant}"</code>
-        <button
-          type="button"
-          onClick={() =>
-            pet.current?.say(
-              <>
-                Hi, I'm <span className="pixel-pet-highlight-pet">{name}</span>!
-              </>,
-            )
-          }
-        >
+        <button type="button" onClick={() => pet.current?.say("Hi, I'm {name}! Nice to **meet** you.")}>
           Say hi
         </button>
       </div>
