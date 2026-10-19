@@ -7,6 +7,7 @@ import './playground/styles.css';
 interface GardenPet {
   variant: PetVariant;
   species: string;
+  spriteSrc?: string;
   name: string;
 }
 
