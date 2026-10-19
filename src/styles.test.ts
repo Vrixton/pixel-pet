@@ -7,6 +7,19 @@ describe('component stylesheet', () => {
     expect(componentStyles).not.toMatch(/(^|[\s,}])(html|body|:root)\s*[{,]/);
   });
 
+  it('prefixes every class and animation name with pixel-pet-', () => {
+    const stylesWithoutUrls = componentStyles.replace(/url\([^)]*\)/g, '');
+    const classNames = stylesWithoutUrls.match(/\.[a-z][\w-]*/gi) ?? [];
+    const animationNames = [...componentStyles.matchAll(/@keyframes\s+([\w-]+)/g)].map(
+      ([, name]) => name,
+    );
+
+    expect(classNames.length).toBeGreaterThan(0);
+    expect(animationNames.length).toBeGreaterThan(0);
+    expect(classNames.filter((name) => !/^\.pixel-pet(-|$)/.test(name))).toEqual([]);
+    expect(animationNames.filter((name) => !name.startsWith('pixel-pet-'))).toEqual([]);
+  });
+
   it('pauses the sprite and skips the dialog animation for reduced motion', () => {
     const reducedMotionBlock = componentStyles.slice(
       componentStyles.indexOf('@media (prefers-reduced-motion: reduce)'),

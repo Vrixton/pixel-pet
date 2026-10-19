@@ -33,7 +33,7 @@
   max-width: 240px;
   box-sizing: border-box;
   text-align: center;
-  animation: petPopIn 0.2s ease-out;
+  animation: pixel-pet-pop-in 0.2s ease-out;
   pointer-events: none;
   position: absolute;
   bottom: 27px;
@@ -42,22 +42,22 @@
   box-shadow: none;
 }
 
-.highlight-pet {
+.pixel-pet-highlight-pet {
   color: #FDDBA0;
   font-weight: bold;
 }
 
-.highlight-happy {
+.pixel-pet-highlight-happy {
   color: #ffeb3b;
   font-weight: bold;
 }
 
-.highlight-angry {
+.pixel-pet-highlight-angry {
   color: #F04037;
   font-weight: bold;
 }
 
-.highlight-curious {
+.pixel-pet-highlight-curious {
   color: #8BE383;
   font-weight: bold;
 }
@@ -84,69 +84,69 @@
   outline-offset: 2px;
 }
 
-.pixel-pet-sprite.flip-x {
+.pixel-pet-sprite.pixel-pet-flip-x {
   transform: scaleX(-1);
 }
 
-.state-idle {
-  animation: catIdle 1s steps(9) infinite;
+.pixel-pet-state-idle {
+  animation: pixel-pet-idle 1s steps(9) infinite;
 }
 
-.state-walk {
-  animation: catWalk 1.3s steps(9) infinite;
+.pixel-pet-state-walk {
+  animation: pixel-pet-walk 1.3s steps(9) infinite;
 }
 
-.state-happy {
-  animation: catHappy 0.8s steps(9) infinite;
+.pixel-pet-state-happy {
+  animation: pixel-pet-happy 0.8s steps(9) infinite;
   height: 65px;
 }
 
-.state-sleep {
-  animation: catSleep 2s steps(9) infinite;
+.pixel-pet-state-sleep {
+  animation: pixel-pet-sleep 2s steps(9) infinite;
   height: 45px;
   width: 65px;
 }
 
-.state-angry {
-  animation: catAngry 0.8s steps(9) infinite;
+.pixel-pet-state-angry {
+  animation: pixel-pet-angry 0.8s steps(9) infinite;
   width: 65px;
 }
 
-.state-curious {
-  animation: catCurious 3s steps(9) infinite;
+.pixel-pet-state-curious {
+  animation: pixel-pet-curious 3s steps(9) infinite;
 }
 
-@keyframes catIdle {
+@keyframes pixel-pet-idle {
   0% { background-position: 0 -5px; }
   100% { background-position: -605px -5px; }
 }
 
-@keyframes catWalk {
+@keyframes pixel-pet-walk {
   0% { background-position: 0 -73px; }
   100% { background-position: -600px -73px; }
 }
 
-@keyframes catHappy {
+@keyframes pixel-pet-happy {
   0% { background-position: 0 -135px; }
   100% { background-position: -610px -135px; }
 }
 
-@keyframes catSleep {
+@keyframes pixel-pet-sleep {
   0% { background-position: 0px -205px; }
   100% { background-position: -610px -205px; }
 }
 
-@keyframes catAngry {
+@keyframes pixel-pet-angry {
   0% { background-position: 0 -250px; }
   100% { background-position: -610px -250px; }
 }
 
-@keyframes catCurious {
+@keyframes pixel-pet-curious {
   0% { background-position: 0 -315px; }
   100% { background-position: -610px -315px; }
 }
 
-@keyframes petPopIn {
+@keyframes pixel-pet-pop-in {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }

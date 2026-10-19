@@ -58,7 +58,7 @@ describe('PixelPet', () => {
     expect(pet).toHaveFocus();
 
     await user.keyboard('{Enter}');
-    expect(pet).toHaveClass('state-happy');
+    expect(pet).toHaveClass('pixel-pet-state-happy');
   });
 });
 
@@ -98,7 +98,7 @@ describe('PixelPet dialog bubble', () => {
       vi.advanceTimersByTime(30000);
     });
 
-    expect(pet.className).toMatch(/state-(happy|angry|curious)/);
+    expect(pet.className).toMatch(/pixel-pet-state-(happy|angry|curious)/);
     expect(getDialog(container)).not.toBeInTheDocument();
 
     act(() => {
@@ -132,7 +132,7 @@ describe('PixelPet sleep', () => {
     fireEvent.pointerMove(window);
     advance(120000);
     const pet = screen.getByRole('button', { name: 'Danko' });
-    expect(pet).toHaveClass('state-sleep');
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
     return pet;
   };
 
@@ -150,7 +150,7 @@ describe('PixelPet sleep', () => {
     fireEvent.keyDown(window, { key: 'Tab' });
     advance(2000);
 
-    expect(pet).not.toHaveClass('state-sleep');
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 
   it('wakes up with a key press', () => {
@@ -158,7 +158,7 @@ describe('PixelPet sleep', () => {
 
     fireEvent.keyDown(window, { key: 'Tab' });
 
-    expect(pet).not.toHaveClass('state-sleep');
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 
   it('wakes up with a touch anywhere on the page', () => {
@@ -166,7 +166,7 @@ describe('PixelPet sleep', () => {
 
     fireEvent.pointerDown(window, { pointerType: 'touch' });
 
-    expect(pet).not.toHaveClass('state-sleep');
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 });
 
@@ -198,7 +198,7 @@ describe('PixelPet reduced motion', () => {
     mockReducedMotion(false);
     render(<PixelPet petName="Danko" />);
 
-    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('state-walk');
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-walk');
   });
 
   it('stays in place when the user prefers reduced motion', () => {
@@ -209,7 +209,7 @@ describe('PixelPet reduced motion', () => {
       vi.advanceTimersByTime(20000);
     });
 
-    expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('state-walk');
+    expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('pixel-pet-state-walk');
   });
 });
 
@@ -228,13 +228,13 @@ describe('PixelPet walking', () => {
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
 
-    expect(pet).not.toHaveClass('state-walk');
+    expect(pet).not.toHaveClass('pixel-pet-state-walk');
 
     act(() => {
       vi.advanceTimersByTime(5000);
     });
 
-    expect(pet).toHaveClass('state-walk');
+    expect(pet).toHaveClass('pixel-pet-state-walk');
   });
 
   it('stops walking when the walk duration ends', () => {
@@ -242,13 +242,13 @@ describe('PixelPet walking', () => {
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
 
-    expect(pet).toHaveClass('state-walk');
+    expect(pet).toHaveClass('pixel-pet-state-walk');
 
     act(() => {
       vi.advanceTimersByTime(5000);
     });
 
-    expect(pet).toHaveClass('state-idle');
+    expect(pet).toHaveClass('pixel-pet-state-idle');
   });
 });
 
@@ -273,13 +273,13 @@ describe('PixelPet emotions', () => {
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
 
-    expect(pet).toHaveClass('state-walk');
+    expect(pet).toHaveClass('pixel-pet-state-walk');
 
     for (let second = 0; second < 30; second += 1) {
       advance(1000);
     }
 
-    expect(pet).toHaveClass('state-happy');
+    expect(pet).toHaveClass('pixel-pet-state-happy');
   });
 
   it('clears the emotion after five seconds when tapping a sleeping pet', () => {
@@ -290,14 +290,14 @@ describe('PixelPet emotions', () => {
     advance(1000);
     fireEvent.pointerMove(window);
     advance(120000);
-    expect(pet).toHaveClass('state-sleep');
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
 
     fireEvent.click(pet);
-    expect(pet).toHaveClass('state-happy');
+    expect(pet).toHaveClass('pixel-pet-state-happy');
 
     advance(5000);
 
-    expect(pet).toHaveClass('state-idle');
+    expect(pet).toHaveClass('pixel-pet-state-idle');
   });
 
   it('stays asleep when falling asleep and an automatic emotion happen at the same time', () => {
@@ -306,11 +306,11 @@ describe('PixelPet emotions', () => {
     const pet = screen.getByRole('button', { name: 'Danko' });
 
     advance(120000);
-    expect(pet).toHaveClass('state-sleep');
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
 
     advance(10000);
 
-    expect(pet).toHaveClass('state-sleep');
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
   });
 });
 
@@ -348,7 +348,7 @@ describe('PixelPet placement', () => {
       vi.advanceTimersByTime(20000);
     });
 
-    expect(pet).not.toHaveClass('state-walk');
+    expect(pet).not.toHaveClass('pixel-pet-state-walk');
   });
 
   it('keeps walking within the width of its parent', () => {
@@ -592,7 +592,7 @@ describe('PixelPet messages', () => {
       pet.focus();
     });
 
-    expect(pet).toHaveClass('state-angry');
+    expect(pet).toHaveClass('pixel-pet-state-angry');
     expect(getDialog(container)).toHaveTextContent('Danko is feeling overwhelmed!');
     vi.useRealTimers();
   });
@@ -647,7 +647,7 @@ describe('PixelPet say()', () => {
 
     say('What is this?', { emotion: 'curious' });
 
-    expect(pet).toHaveClass('state-curious');
+    expect(pet).toHaveClass('pixel-pet-state-curious');
     expect(getDialog(container)).toHaveTextContent('What is this?');
   });
 
@@ -672,11 +672,11 @@ describe('PixelPet say()', () => {
     advance(1000);
     fireEvent.pointerMove(window);
     advance(120000);
-    expect(pet).toHaveClass('state-sleep');
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
 
     say('Wake up!');
 
-    expect(pet).not.toHaveClass('state-sleep');
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
     expect(getDialog(container)).toHaveTextContent('Wake up!');
   });
 
@@ -691,7 +691,7 @@ describe('PixelPet say()', () => {
     const transformWhileSpeaking = walker?.style.transform;
     advance(2000);
 
-    expect(pet).toHaveClass('state-idle');
+    expect(pet).toHaveClass('pixel-pet-state-idle');
     expect(walker?.style.transform).toBe(transformWhileSpeaking);
   });
 

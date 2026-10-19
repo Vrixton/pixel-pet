@@ -129,20 +129,20 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const emotionMessages: Record<PetEmotion, React.ReactNode> = {
     happy: messages?.happy ?? (
       <>
-        <span className="highlight-pet">{petName}</span> is feeling{' '}
-        <span className="highlight-happy">happy</span>!
+        <span className="pixel-pet-highlight-pet">{petName}</span> is feeling{' '}
+        <span className="pixel-pet-highlight-happy">happy</span>!
       </>
     ),
     angry: messages?.angry ?? (
       <>
-        <span className="highlight-pet">{petName}</span> is feeling{' '}
-        <span className="highlight-angry">overwhelmed</span>!
+        <span className="pixel-pet-highlight-pet">{petName}</span> is feeling{' '}
+        <span className="pixel-pet-highlight-angry">overwhelmed</span>!
       </>
     ),
     curious: messages?.curious ?? (
       <>
-        <span className="highlight-pet">{petName}</span> is very{' '}
-        <span className="highlight-curious">curious</span>
+        <span className="pixel-pet-highlight-pet">{petName}</span> is very{' '}
+        <span className="pixel-pet-highlight-curious">curious</span>
       </>
     ),
   };
@@ -430,9 +430,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
 
   const getCurrentStateClass = () => {
-    if (visibleEmotion) return `state-${visibleEmotion}`;
-    if ((!canWalk || isSpeaking) && action === 'walk') return 'state-idle';
-    return `state-${action}`;
+    if (visibleEmotion) return `pixel-pet-state-${visibleEmotion}`;
+    if ((!canWalk || isSpeaking) && action === 'walk') return 'pixel-pet-state-idle';
+    return `pixel-pet-state-${action}`;
   };
 
   const getDialogStyle = (emotion: PetEmotion | null): CSSProperties => {
@@ -489,7 +489,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           type="button"
           aria-label={label ?? petName}
           className={`pixel-pet-sprite ${getCurrentStateClass()} ${
-            direction === 'left' ? 'flip-x' : ''
+            direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}
           style={{
             backgroundImage: `url("${spriteSrc ?? SPRITES[variant]}")`,
