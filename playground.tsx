@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import ReactDOM from 'react-dom/client';
-import { PixelPet, type PetVariant, type PixelPetHandle } from './src/index';
+import { PixelPet, type PetMode, type PetVariant, type PixelPetHandle } from './src/index';
 import './src/styles.css';
 import './playground/styles.css';
 
@@ -10,15 +10,19 @@ interface GardenPet {
   spriteSrc?: string;
   name: string;
   color: string;
+  mode: PetMode;
 }
 
 const PETS: GardenPet[] = [
-  { variant: 'cat', species: 'Cat', name: 'Static', color: '#F8C38E' },
-  { variant: 'dog', species: 'Dog', name: 'Danko', color: '#D9925A' },
-  { variant: 'axolotl', species: 'Axolotl', name: 'Momo', color: '#F07A9C' },
-  { variant: 'parakeet', species: 'Parakeet', name: 'Kiwi', color: '#B8A6F5' },
-  { variant: 'hamster', species: 'Hamster', name: 'Nugget', color: '#F2C14E' },
+  { variant: 'cat', species: 'Cat', name: 'Static', color: '#F8C38E', mode: 'live' },
+  { variant: 'dog', species: 'Dog', name: 'Danko', color: '#D9925A', mode: 'showcase' },
+  { variant: 'axolotl', species: 'Axolotl', name: 'Momo', color: '#F07A9C', mode: 'showcase' },
+  { variant: 'parakeet', species: 'Parakeet', name: 'Kiwi', color: '#B8A6F5', mode: 'showcase' },
+  { variant: 'hamster', species: 'Hamster', name: 'Nugget', color: '#F2C14E', mode: 'live' },
 ];
+
+const LIVE_PETS = PETS.filter((pet) => pet.mode === 'live');
+const SHOWCASE_PETS = PETS.filter((pet) => pet.mode === 'showcase');
 
 const Plot = ({ variant, species, name, color }: GardenPet) => {
   const pet = useRef<PixelPetHandle>(null);
@@ -39,6 +43,26 @@ const Plot = ({ variant, species, name, color }: GardenPet) => {
   );
 };
 
+const Showcase = () => (
+  <section className="showcase" aria-labelledby="showcase-title">
+    <div className="sign sign-wide">
+      <h2 id="showcase-title">Showcase</h2>
+      <code>mode="showcase"</code>
+      <p>These pets only idle and sleep. Click one to hear its name.</p>
+    </div>
+    <div className="pads">
+      {SHOWCASE_PETS.map(({ variant, name, color }) => (
+        <figure key={variant} className="pad">
+          <div className="pad-stage">
+            <PixelPet petName={name} variant={variant} color={color} mode="showcase" />
+          </div>
+          <figcaption>{name}</figcaption>
+        </figure>
+      ))}
+    </div>
+  </section>
+);
+
 const App = () => (
   <main className="garden">
     <header className="title">
@@ -46,9 +70,10 @@ const App = () => (
       <p>Pixel art pets for React. Tap or click a pet to see how it feels.</p>
       <code className="install">pnpm add @vrixton/pixel-pet</code>
     </header>
-    {PETS.map((pet) => (
+    {LIVE_PETS.map((pet) => (
       <Plot key={pet.variant} {...pet} />
     ))}
+    <Showcase />
   </main>
 );
 
