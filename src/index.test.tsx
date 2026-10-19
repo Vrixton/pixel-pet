@@ -23,6 +23,20 @@ describe('PixelPet', () => {
     expect(getSprite(container)?.style.backgroundImage).toContain('dog-sprite');
   });
 
+  it('uses spriteSrc instead of the variant sprite when provided', () => {
+    const { container } = render(<PixelPet variant="dog" spriteSrc="/pets/danko.png" />);
+    const backgroundImage = getSprite(container)?.style.backgroundImage;
+
+    expect(backgroundImage).toContain('/pets/danko.png');
+    expect(backgroundImage).not.toContain('dog-sprite');
+  });
+
+  it('keeps a spriteSrc with spaces and parentheses intact', () => {
+    const { container } = render(<PixelPet spriteSrc="/pets/my dog (v2).png" />);
+
+    expect(getSprite(container)?.style.backgroundImage).toBe('url("/pets/my dog (v2).png")');
+  });
+
   it('exposes the pet as a button named after the pet', () => {
     render(<PixelPet petName="Danko" />);
 

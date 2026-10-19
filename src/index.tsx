@@ -67,6 +67,7 @@ const usePrefersReducedMotion = () =>
 export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
+  spriteSrc?: string;
   label?: string;
   walk?: boolean;
   messages?: PetMessages;
@@ -98,6 +99,7 @@ const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
 export const PixelPet: React.FC<PixelPetProps> = ({
   petName = 'Static',
   variant = 'cat',
+  spriteSrc,
   label,
   walk = true,
   messages,
@@ -490,7 +492,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
             direction === 'left' ? 'flip-x' : ''
           }`}
           style={{
-            backgroundImage: `url(${SPRITES[variant]})`,
+            backgroundImage: `url("${spriteSrc ?? SPRITES[variant]}")`,
           }}
           onClick={handleClick}
           onFocus={() => setIsFocused(true)}
