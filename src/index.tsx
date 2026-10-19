@@ -41,7 +41,7 @@ const DIALOG_EDGE_GAP = 4;
 const DIALOG_MAX_WIDTH = 240;
 const DEFAULT_SPEECH_DURATION = 5000;
 const CLICK_BUBBLE_DURATION = 3000;
-const MESSAGE_MARKERS = /(\{name\}|\*\*[^*]+\*\*)/;
+const MESSAGE_MARKERS = /(\{name\}|\*\*[^*]+\*\*|__[^_]+__)/;
 
 const DEFAULT_MESSAGES: Record<PetEmotion, string> = {
   happy: '{name} is feeling **happy**!',
@@ -137,10 +137,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     if (typeof message !== 'string') return message;
     return message.split(MESSAGE_MARKERS).map((part, index) => {
       if (index % 2 === 0) return part;
-      if (part === '{name}') {
+      if (part === '{name}' || part.startsWith('__')) {
         return (
           <span key={index} className="pixel-pet-highlight-pet">
-            {petName}
+            {part === '{name}' ? petName : part.slice(2, -2)}
           </span>
         );
       }

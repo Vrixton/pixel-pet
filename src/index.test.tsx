@@ -956,6 +956,18 @@ describe('PixelPet message markers', () => {
     expect(highlight(container, 'curious')).toEqual(['eso']);
   });
 
+  it('paints __words__ in the pet color for names filled in by a translation system', () => {
+    const { container } = render(
+      <PixelPet petName="Bit" messages={{ happy: '__Bit__ is **happy**.' }} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Bit is happy.');
+    expect(highlight(container, 'pet')).toEqual(['Bit']);
+    expect(highlight(container, 'happy')).toEqual(['happy']);
+  });
+
   it('replaces {name} in the accessible label', () => {
     render(<PixelPet petName="Bit" label="{name}, la mascota" />);
 
@@ -967,10 +979,12 @@ describe('PixelPet message markers', () => {
     const { container } = render(<PixelPet petName="Bit" ref={handle} />);
 
     act(() => {
-      handle.current?.say('2 * 3 = 6 {not a marker}');
+      handle.current?.say('2 * 3 = 6 {not a marker} snake_case_name');
     });
 
-    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('2 * 3 = 6 {not a marker}');
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent(
+      '2 * 3 = 6 {not a marker} snake_case_name',
+    );
 
     act(() => {
       handle.current?.say(<em>{'{name}'}</em>);
