@@ -61,6 +61,7 @@ export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
   spriteSrc?: string;
+  color?: string;
   label?: string;
   walk?: boolean;
   messages?: PetMessages;
@@ -86,13 +87,14 @@ const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
 
 const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
   backgroundColor: '#05080cd9',
-  borderColor: '#FDDBA0',
+  borderColor: 'var(--pixel-pet-color, #FDDBA0)',
 };
 
 export const PixelPet: React.FC<PixelPetProps> = ({
   petName = 'Static',
   variant = 'cat',
   spriteSrc,
+  color,
   label,
   walk = true,
   messages,
@@ -452,7 +454,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   return (
-    <div className="pixel-pet" ref={stageRef}>
+    <div
+      className="pixel-pet"
+      ref={stageRef}
+      style={color ? ({ '--pixel-pet-color': color } as CSSProperties) : undefined}
+    >
       <div
         ref={walkerRef}
         className="pixel-pet-container"

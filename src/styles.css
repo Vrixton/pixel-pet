@@ -43,7 +43,7 @@
 }
 
 .pixel-pet-highlight-pet {
-  color: #FDDBA0;
+  color: var(--pixel-pet-color, #FDDBA0);
   font-weight: bold;
 }
 

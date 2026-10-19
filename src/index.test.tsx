@@ -732,3 +732,50 @@ describe('PixelPet say()', () => {
     expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
   });
 });
+
+describe('PixelPet color', () => {
+  const getRoot = (container: HTMLElement) => container.querySelector<HTMLElement>('.pixel-pet');
+
+  const renderSpeaking = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    const handle = createRef<PixelPetHandle>();
+    const view = render(<PixelPet petName="Danko" ref={handle} {...props} />);
+    act(() => {
+      handle.current?.say('Hello');
+    });
+    return { ...view, dialog: view.container.querySelector<HTMLElement>('.pixel-pet-dialog') };
+  };
+
+  it('exposes the color as a CSS variable on the pet', () => {
+    const { container } = render(<PixelPet color="#8BE383" />);
+
+    expect(getRoot(container)?.style.getPropertyValue('--pixel-pet-color')).toBe('#8BE383');
+  });
+
+  it('leaves the CSS variable unset without a color', () => {
+    const { container } = render(<PixelPet />);
+
+    expect(getRoot(container)?.style.getPropertyValue('--pixel-pet-color')).toBe('');
+  });
+
+  it('paints the pet name with the color', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<PixelPet petName="Danko" color="#8BE383" />);
+
+    await user.click(screen.getByRole('button', { name: 'Danko' }));
+
+    const name = container.querySelector<HTMLElement>('.pixel-pet-highlight-pet');
+    expect(getComputedStyle(name!).color).toBe('var(--pixel-pet-color, #FDDBA0)');
+  });
+
+  it('paints the border of a neutral speech bubble with the color', () => {
+    const { dialog } = renderSpeaking({ color: '#8BE383' });
+
+    expect(dialog?.style.border).toBe('1px solid var(--pixel-pet-color, #FDDBA0)');
+  });
+
+  it('lets dialogStyle override the color of a neutral speech bubble', () => {
+    const { dialog } = renderSpeaking({ color: '#8BE383', dialogStyle: { borderColor: '#123456' } });
+
+    expect(dialog?.style.border).toBe('1px solid rgb(18, 52, 86)');
+  });
+});

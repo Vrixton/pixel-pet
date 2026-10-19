@@ -71,12 +71,30 @@ The message shows right away, without hovering, and screen readers announce it. 
 | `petName` | `string` | `'Static'` | The name shown in the mood messages. |
 | `variant` | `'cat' \| 'dog' \| 'axolotl' \| 'parakeet' \| 'hamster'` | `'cat'` | Which of the bundled sprites to use. |
 | `spriteSrc` | `string` | none | A URL for your own sprite sheet. It takes priority over `variant`. |
+| `color` | `string` | `'#FDDBA0'` | The pet's main color, used for its name and for the border of neutral speech bubbles. |
 | `label` | `string` | `petName` | The accessible name of the pet's button. |
 | `walk` | `boolean` | `true` | Set it to `false` to keep the pet in place. |
 | `messages` | `PetMessages` | English messages | Replaces the text shown for each emotion. |
 | `dialogStyle` | `DialogStyleProps` | none | Styles for every bubble. |
 | `emotionDialogStyles` | `Partial<Record<PetEmotion, DialogStyleProps>>` | none | Styles for the bubble of a single emotion. |
 | `ref` | `Ref<PixelPetHandle>` | none | Gives you the `say()` method. |
+
+## Reusing a configuration
+
+`PixelPetProps` is exported, so you can keep a pet's settings in one typed object and spread it:
+
+```tsx
+import { PixelPet, type PixelPetProps } from '@vrixton/pixel-pet';
+
+const danko: PixelPetProps = {
+  petName: 'Danko',
+  variant: 'dog',
+  color: '#8BE383',
+};
+
+<PixelPet {...danko} />
+<PixelPet {...danko} walk={false} />
+```
 
 ## Translating the messages
 
@@ -114,6 +132,8 @@ The highlight classes are `pixel-pet-highlight-pet`, `pixel-pet-highlight-happy`
 | `fontFamily` | `'monospace'` |
 
 A field set in `emotionDialogStyles` wins over the same field in `dialogStyle`, which wins over the default. Messages from `say()` without an emotion use `dialogStyle`.
+
+The `color` prop sets the `--pixel-pet-color` CSS variable on the pet. You can also set that variable from your own stylesheet on any element that contains the pet.
 
 ## Custom sprites
 
