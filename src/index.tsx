@@ -22,6 +22,7 @@ export interface DialogStyleProps {
 export type PetEmotion = 'happy' | 'angry' | 'curious';
 export type PetAction = 'idle' | 'walk' | 'sleep';
 export type PetVariant = 'cat' | 'dog';
+export type PetMessages = Partial<Record<PetEmotion, React.ReactNode>>;
 
 const SPRITES: Record<PetVariant, string> = {
   cat: catSprite,
@@ -57,12 +58,7 @@ export interface PixelPetProps {
   variant?: PetVariant;
   label?: string;
   walk?: boolean;
-  messages?: {
-    default?: React.ReactNode;
-    happy?: React.ReactNode;
-    angry?: React.ReactNode;
-    curious?: React.ReactNode;
-  };
+  messages?: PetMessages;
   dialogStyle?: DialogStyleProps;
   emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
 }
@@ -108,22 +104,22 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [direction, setDirection] = useState<'left' | 'right'>('right');
 
   const emotionMessages: Record<PetEmotion, React.ReactNode> = {
-    happy: messages?.happy || (
+    happy: messages?.happy ?? (
       <>
-        ¡<span className="highlight-pet">{petName}</span> se siente{' '}
-        <span className="highlight-happy">feliz</span>!
+        <span className="highlight-pet">{petName}</span> is feeling{' '}
+        <span className="highlight-happy">happy</span>!
       </>
     ),
-    angry: messages?.angry || (
+    angry: messages?.angry ?? (
       <>
-        ¡<span className="highlight-pet">{petName}</span> se siente{' '}
-        <span className="highlight-angry">abrumado</span>!
+        <span className="highlight-pet">{petName}</span> is feeling{' '}
+        <span className="highlight-angry">overwhelmed</span>!
       </>
     ),
-    curious: messages?.curious || (
+    curious: messages?.curious ?? (
       <>
-        <span className="highlight-pet">{petName}</span> siente mucha{' '}
-        <span className="highlight-curious">curiosidad</span>
+        <span className="highlight-pet">{petName}</span> is very{' '}
+        <span className="highlight-curious">curious</span>
       </>
     ),
   };

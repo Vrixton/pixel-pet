@@ -62,7 +62,7 @@ describe('PixelPet dialog bubble', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
 
-    expect(getDialog(container)).toHaveTextContent('Danko se siente feliz');
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
   });
 
   it('announces the bubble through a status region when activated with the keyboard', async () => {
@@ -72,7 +72,7 @@ describe('PixelPet dialog bubble', () => {
     await user.tab();
     await user.keyboard('{Enter}');
 
-    expect(screen.getByRole('status')).toHaveTextContent('Danko se siente feliz');
+    expect(screen.getByRole('status')).toHaveTextContent('Danko is feeling happy!');
   });
 
   it('keeps automatic emotions silent until the pet is hovered or focused', () => {
@@ -535,5 +535,51 @@ describe('PixelPet walking performance', () => {
 
     expect(walker?.style.transform).not.toBe(startTransform);
     expect(commits - commitsBefore).toBe(0);
+  });
+});
+
+describe('PixelPet messages', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('uses English messages by default', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
+  });
+
+  it('uses the message passed for the emotion, for example in another language', () => {
+    const { container } = render(
+      <PixelPet petName="Danko" messages={{ happy: '¡Danko se siente feliz!' }} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)).toHaveTextContent('¡Danko se siente feliz!');
+  });
+
+  it('keeps the default for emotions without a custom message', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const { container } = render(
+      <PixelPet petName="Danko" messages={{ happy: '¡Danko se siente feliz!' }} />,
+    );
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    act(() => {
+      vi.advanceTimersByTime(30000);
+    });
+    act(() => {
+      pet.focus();
+    });
+
+    expect(pet).toHaveClass('state-angry');
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling overwhelmed!');
+    vi.useRealTimers();
   });
 });
