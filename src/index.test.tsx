@@ -298,3 +298,59 @@ describe('PixelPet emotions', () => {
     expect(pet).toHaveClass('state-sleep');
   });
 });
+
+describe('PixelPet placement', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  it('positions itself inside its parent instead of the viewport', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const stage = container.querySelector<HTMLElement>('.pixel-pet');
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+
+    expect(stage).toBeInTheDocument();
+    expect(getComputedStyle(stage as HTMLElement).position).toBe('absolute');
+    expect(getComputedStyle(walker as HTMLElement).position).toBe('absolute');
+  });
+
+  it('does not walk when the walk prop is false', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    render(<PixelPet petName="Danko" walk={false} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    act(() => {
+      vi.advanceTimersByTime(20000);
+    });
+
+    expect(pet).not.toHaveClass('state-walk');
+  });
+
+  it('keeps walking within the width of its parent', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const positions: number[] = [];
+
+    for (let step = 0; step < 50; step += 1) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      positions.push(getPositionX(container));
+    }
+
+    expect(Math.max(...positions)).toBeLessThanOrEqual(240);
+    expect(Math.min(...positions)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...positions)).toBeGreaterThan(200);
+  });
+});

@@ -21,42 +21,44 @@ const App = () => {
       filter: 'drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.8))',
       marginLeft: '25px'
     }} className='press-start-2p'>PIXEL PET</span> </h1>
-      <PixelPet
-        petName="Danko"
-        variant="dog"
-        emotionDialogStyles={{
-          happy: {
-            backgroundColor: '#1e1c063d',
-            borderColor: '#ffeb3b',
-          },
-          angry: {
-            backgroundColor: '#21090833',
-            borderColor: '#F04037',
-          },
-          curious: {
-            backgroundColor: '#1f341d3a',
-            borderColor: '#8BE383',
-          },
-        }}
-      />
-      <PixelPet
-        petName="Static"
-        variant="cat"
-        emotionDialogStyles={{
-          happy: {
-            backgroundColor: '#1e1c063d',
-            borderColor: '#ffeb3b',
-          },
-          angry: {
-            backgroundColor: '#21090833',
-            borderColor: '#F04037',
-          },
-          curious: {
-            backgroundColor: '#1f341d3a',
-            borderColor: '#8BE383',
-          },
-        }}
-      />
+      <div className="playground-screen">
+        <PixelPet
+          petName="Danko"
+          variant="dog"
+          emotionDialogStyles={{
+            happy: {
+              backgroundColor: '#1e1c063d',
+              borderColor: '#ffeb3b',
+            },
+            angry: {
+              backgroundColor: '#21090833',
+              borderColor: '#F04037',
+            },
+            curious: {
+              backgroundColor: '#1f341d3a',
+              borderColor: '#8BE383',
+            },
+          }}
+        />
+        <PixelPet
+          petName="Static"
+          variant="cat"
+          emotionDialogStyles={{
+            happy: {
+              backgroundColor: '#1e1c063d',
+              borderColor: '#ffeb3b',
+            },
+            angry: {
+              backgroundColor: '#21090833',
+              borderColor: '#F04037',
+            },
+            curious: {
+              backgroundColor: '#1f341d3a',
+              borderColor: '#8BE383',
+            },
+          }}
+        />
+      </div>
     </div>
   );
 };

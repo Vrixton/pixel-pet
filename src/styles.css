@@ -1,13 +1,19 @@
+.pixel-pet {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .pixel-pet-container {
-  position: fixed;
-  bottom: 100px;
+  position: absolute;
+  bottom: 0;
   left: 0;
-  z-index: 9999;
   display: flex;
   flex-direction: column;
   align-items: center;
   user-select: none;
   will-change: transform;
+  pointer-events: auto;
 }
 
 .pixel-pet-status {

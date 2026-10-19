@@ -42,6 +42,7 @@ export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
   label?: string;
+  walk?: boolean;
   size?: number;
   messages?: {
     default?: React.ReactNode;
@@ -72,6 +73,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   petName = 'Static',
   variant = 'cat',
   label,
+  walk = true,
   size = 60,
   messages,
   dialogStyle = {},
@@ -79,6 +81,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 }) => {
   const [action, setAction] = useState<PetAction>('idle');
   const prefersReducedMotion = usePrefersReducedMotion();
+  const canWalk = walk && !prefersReducedMotion;
+  const stageRef = useRef<HTMLDivElement>(null);
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
@@ -193,7 +197,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, []);
 
   useEffect(() => {
-    if (action === 'sleep' || prefersReducedMotion) return;
+    if (action === 'sleep' || !canWalk) return;
 
     if (action === 'walk') {
       const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
@@ -222,17 +226,17 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
-  }, [action, prefersReducedMotion]);
+  }, [action, canWalk]);
 
   useEffect(() => {
-    if (action !== 'walk' || activeEmotion !== null || prefersReducedMotion) {
+    if (action !== 'walk' || activeEmotion !== null || !canWalk) {
       if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
       return;
     }
 
     const speed = 2;
     const minBoundary = 0;
-    const maxBoundary = window.innerWidth - size;
+    const maxBoundary = (stageRef.current?.clientWidth ?? 0) - size;
 
     walkIntervalRef.current = setInterval(() => {
       setPosX((prevX) => {
@@ -261,7 +265,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
     };
-  }, [action, activeEmotion, direction, size, prefersReducedMotion]);
+  }, [action, activeEmotion, direction, size, canWalk]);
 
   const handleClick = () => {
     const now = Date.now();
@@ -306,7 +310,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const getCurrentStateClass = () => {
     if (visibleEmotion) return `state-${visibleEmotion}`;
-    if (prefersReducedMotion && action === 'walk') return 'state-idle';
+    if (!canWalk && action === 'walk') return 'state-idle';
     return `state-${action}`;
   };
 
@@ -336,33 +340,35 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   return (
-    <div
-      className="pixel-pet-container"
-      style={{ transform: `translateX(${posX}px)` }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}>
+    <div className="pixel-pet" ref={stageRef}>
+      <div
+        className="pixel-pet-container"
+        style={{ transform: `translateX(${posX}px)` }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}>
 
-      <div className="pixel-pet-status" role="status">
-        {visibleEmotion && (isHovered || isFocused || isUserTriggered) && (
-          <div className="pixel-pet-dialog" style={getDialogStyle()}>
-            {emotionMessages[visibleEmotion]}
-          </div>
-        )}
+        <div className="pixel-pet-status" role="status">
+          {visibleEmotion && (isHovered || isFocused || isUserTriggered) && (
+            <div className="pixel-pet-dialog" style={getDialogStyle()}>
+              {emotionMessages[visibleEmotion]}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          aria-label={label ?? petName}
+          className={`pixel-pet-sprite ${getCurrentStateClass()} ${
+            direction === 'left' ? 'flip-x' : ''
+          }`}
+          style={{
+            backgroundImage: `url(${SPRITES[variant]})`,
+          }}
+          onClick={handleClick}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
       </div>
-
-      <button
-        type="button"
-        aria-label={label ?? petName}
-        className={`pixel-pet-sprite ${getCurrentStateClass()} ${
-          direction === 'left' ? 'flip-x' : ''
-        }`}
-        style={{
-          backgroundImage: `url(${SPRITES[variant]})`,
-        }}
-        onClick={handleClick}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-      />
     </div>
   );
 };
