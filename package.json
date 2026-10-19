@@ -1,7 +1,7 @@
 {
-  "name": "pixel-cat-pet",
-  "version": "1.0.0",
-  "description": "Un componente de mascota virtual retro estilo Pokémon para sitios React",
+  "name": "@vrixton/pixel-pet",
+  "version": "0.1.0",
+  "description": "A pixel art pet for React that walks, sleeps, reacts to clicks, and speaks on demand.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -52,13 +52,22 @@
   "keywords": [
     "react",
     "virtual-pet",
-    "tamagotchi",
     "pixel-art",
-    "pokemon",
     "widget"
   ],
   "author": "Victor Villavicencio",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vrixton/pixel-pet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Vrixton/pixel-pet/issues"
+  },
+  "homepage": "https://github.com/Vrixton/pixel-pet#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "packageManager": "pnpm@12.5.1",
   "engines": {
     "node": ">=24"
