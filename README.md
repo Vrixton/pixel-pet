@@ -101,25 +101,23 @@ const danko: PixelPetProps = {
 
 ## Translating the messages
 
-Each message accepts any React node, so you can translate it and keep the colored words:
+Messages can be plain strings with two markers, so they fit in translation files as they are:
 
 ```tsx
 <PixelPet
   petName="Danko"
+  label="{name}, the pet"
   messages={{
-    happy: (
-      <>
-        <span className="pixel-pet-highlight-pet">Danko</span> está{' '}
-        <span className="pixel-pet-highlight-happy">feliz</span>.
-      </>
-    ),
-    angry: 'Danko está abrumado.',
-    curious: 'Danko tiene mucha curiosidad.',
+    happy: '{name} está **feliz**.',
+    angry: '{name} está **abrumado**.',
+    curious: '{name} tiene mucha **curiosidad**.',
   }}
 />
 ```
 
-The highlight classes are `pixel-pet-highlight-pet`, `pixel-pet-highlight-happy`, `pixel-pet-highlight-angry`, and `pixel-pet-highlight-curious`. Any emotion you leave out keeps its English message.
+`{name}` becomes the pet's name in its color, and `**word**` shows that word in the color of the emotion. The markers also work in `say()`: there, `**word**` takes the color of the requested emotion, or the pet's color when there is none. In `label`, which screen readers read aloud, only `{name}` is replaced. Any emotion you leave out keeps its English message.
+
+Messages can also be any React node when you need more control. The highlight classes are `pixel-pet-highlight-pet`, `pixel-pet-highlight-happy`, `pixel-pet-highlight-angry`, and `pixel-pet-highlight-curious`.
 
 ## Styling the bubble
 

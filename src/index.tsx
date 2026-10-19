@@ -41,6 +41,13 @@ const DIALOG_EDGE_GAP = 4;
 const DIALOG_MAX_WIDTH = 240;
 const DEFAULT_SPEECH_DURATION = 5000;
 const CLICK_BUBBLE_DURATION = 3000;
+const MESSAGE_MARKERS = /(\{name\}|\*\*[^*]+\*\*)/;
+
+const DEFAULT_MESSAGES: Record<PetEmotion, string> = {
+  happy: '{name} is feeling **happy**!',
+  angry: '{name} is feeling **overwhelmed**!',
+  curious: '{name} is very **curious**',
+};
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
@@ -126,25 +133,29 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [stageWidth, setStageWidth] = useState<number>(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
 
+  const formatMessage = (message: React.ReactNode, emotion: PetEmotion | null): React.ReactNode => {
+    if (typeof message !== 'string') return message;
+    return message.split(MESSAGE_MARKERS).map((part, index) => {
+      if (index % 2 === 0) return part;
+      if (part === '{name}') {
+        return (
+          <span key={index} className="pixel-pet-highlight-pet">
+            {petName}
+          </span>
+        );
+      }
+      return (
+        <span key={index} className={`pixel-pet-highlight-${emotion ?? 'pet'}`}>
+          {part.slice(2, -2)}
+        </span>
+      );
+    });
+  };
+
   const emotionMessages: Record<PetEmotion, React.ReactNode> = {
-    happy: messages?.happy ?? (
-      <>
-        <span className="pixel-pet-highlight-pet">{petName}</span> is feeling{' '}
-        <span className="pixel-pet-highlight-happy">happy</span>!
-      </>
-    ),
-    angry: messages?.angry ?? (
-      <>
-        <span className="pixel-pet-highlight-pet">{petName}</span> is feeling{' '}
-        <span className="pixel-pet-highlight-angry">overwhelmed</span>!
-      </>
-    ),
-    curious: messages?.curious ?? (
-      <>
-        <span className="pixel-pet-highlight-pet">{petName}</span> is very{' '}
-        <span className="pixel-pet-highlight-curious">curious</span>
-      </>
-    ),
+    happy: formatMessage(messages?.happy ?? DEFAULT_MESSAGES.happy, 'happy'),
+    angry: formatMessage(messages?.angry ?? DEFAULT_MESSAGES.angry, 'angry'),
+    curious: formatMessage(messages?.curious ?? DEFAULT_MESSAGES.curious, 'curious'),
   };
 
   const actionRef = useRef<PetAction>(action);
@@ -501,14 +512,16 @@ export const PixelPet: React.FC<PixelPetProps> = ({
                 }),
               }}
             >
-              {isSpeaking ? speech.message : visibleEmotion && emotionMessages[visibleEmotion]}
+              {isSpeaking
+                ? formatMessage(speech.message, speech.emotion)
+                : visibleEmotion && emotionMessages[visibleEmotion]}
             </div>
           )}
         </div>
 
         <button
           type="button"
-          aria-label={label ?? petName}
+          aria-label={(label ?? petName).split('{name}').join(petName)}
           className={`pixel-pet-sprite pixel-pet-${variant} ${getCurrentStateClass()} ${
             direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}

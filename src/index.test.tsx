@@ -919,3 +919,63 @@ describe('PixelPet click bubble', () => {
     expect(getDialog(container)).toBeInTheDocument();
   });
 });
+
+describe('PixelPet message markers', () => {
+  const highlight = (container: HTMLElement, kind: string) =>
+    [...container.querySelectorAll(`.pixel-pet-dialog .pixel-pet-highlight-${kind}`)].map(
+      (element) => element.textContent,
+    );
+
+  it('replaces {name} and highlights **words** in custom emotion messages', () => {
+    const { container } = render(
+      <PixelPet petName="Bit" messages={{ happy: '{name} está **feliz**.' }} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Bit está feliz.');
+    expect(highlight(container, 'pet')).toEqual(['Bit']);
+    expect(highlight(container, 'happy')).toEqual(['feliz']);
+  });
+
+  it('uses the color of the emotion or of the pet for **words** in say()', () => {
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Bit" ref={handle} />);
+
+    act(() => {
+      handle.current?.say('Soy {name} y esto es **importante**.');
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Soy Bit y esto es importante.');
+    expect(highlight(container, 'pet')).toEqual(['Bit', 'importante']);
+
+    act(() => {
+      handle.current?.say('¿Qué es **eso**?', { emotion: 'curious' });
+    });
+
+    expect(highlight(container, 'curious')).toEqual(['eso']);
+  });
+
+  it('replaces {name} in the accessible label', () => {
+    render(<PixelPet petName="Bit" label="{name}, la mascota" />);
+
+    expect(screen.getByRole('button', { name: 'Bit, la mascota' })).toBeInTheDocument();
+  });
+
+  it('leaves text without markers and JSX messages untouched', () => {
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Bit" ref={handle} />);
+
+    act(() => {
+      handle.current?.say('2 * 3 = 6 {not a marker}');
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('2 * 3 = 6 {not a marker}');
+
+    act(() => {
+      handle.current?.say(<em>{'{name}'}</em>);
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog em')).toHaveTextContent('{name}');
+  });
+});
