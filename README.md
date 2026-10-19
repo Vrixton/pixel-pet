@@ -75,8 +75,9 @@ Call `pet.current?.hush()` to close the current message right away, for example 
 | `spriteSrc` | `string` | none | A URL for your own sprite sheet. It takes priority over `variant`. |
 | `color` | `string` | `'#FDDBA0'` | The pet's main color, used for its name and for the border of neutral speech bubbles. |
 | `label` | `string` | `petName` | The accessible name of the pet's button. |
+| `mode` | `'live' \| 'showcase'` | `'live'` | Use `'showcase'` for a pet on display, such as in a pet picker: it only idles, falls asleep, and says its name when clicked. |
 | `walk` | `boolean` | `true` | Set it to `false` to keep the pet in place. |
-| `messages` | `PetMessages` | English messages | Replaces the text shown for each emotion. |
+| `messages` | `PetMessages` | English messages | Replaces the text shown for each emotion and the showcase greeting. |
 | `dialogStyle` | `DialogStyleProps` | none | Styles for every bubble. |
 | `emotionDialogStyles` | `Partial<Record<PetEmotion, DialogStyleProps>>` | none | Styles for the bubble of a single emotion. |
 | `onClick` | `(event) => void` | none | Called when the user clicks or taps the pet. Call `event.preventDefault()` inside it to skip the pet's own reaction. |
@@ -111,6 +112,7 @@ Messages can be plain strings with two markers, so they fit in translation files
     happy: '{name} está **feliz**.',
     angry: '{name} está **abrumado**.',
     curious: '{name} tiene mucha **curiosidad**.',
+    greeting: '¡Hola, soy {name}!',
   }}
 />
 ```
@@ -143,6 +145,8 @@ A sheet passed through `spriteSrc` has to follow the same layout as the bundled 
 ## How it behaves
 
 The pet wanders on its own, sometimes walking and sometimes standing, and turns around at the edges of the container. Every 30 seconds it may switch to a random mood for 5 seconds; hovering over it or focusing it with the keyboard shows what it's feeling. Clicking it shows its last mood for three seconds, and clicking it more than five times in ten seconds makes it angry. After a click, the bubble stays hidden while the pointer rests on the pet; moving the pointer away and back shows it again. After two minutes without mouse, touch, keyboard, or scroll wheel activity on the page, it falls asleep, and any activity wakes it up.
+
+With `mode="showcase"`, the pet stays in place playing its idle animation, with no random moods and no bubble on hover. Clicking it shows `messages.greeting`, or "Hi, I'm {name}!" by default, for three seconds, without getting angry however many times it is clicked. It still falls asleep after two minutes without activity, and `say()` and `hush()` keep working.
 
 The pet is a real button, so it can be reached with the keyboard, has a visible focus outline, and is announced with its name. When the user prefers reduced motion, it stays still, its animation pauses, and the bubble appears without its pop-in effect.
 
