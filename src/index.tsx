@@ -40,6 +40,7 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const DIALOG_EDGE_GAP = 4;
 const DIALOG_MAX_WIDTH = 240;
 const DEFAULT_SPEECH_DURATION = 5000;
+const CLICK_BUBBLE_DURATION = 3000;
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
@@ -116,6 +117,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
+  const [isHoverMuted, setIsHoverMuted] = useState<boolean>(false);
   const [speech, setSpeech] = useState<{ message: React.ReactNode; emotion: PetEmotion | null } | null>(
     null,
   );
@@ -153,6 +155,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
+  const clickBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSpeakingRef = useRef<boolean>(false);
   const speechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -263,6 +266,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
       if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
+      if (clickBubbleTimerRef.current) clearTimeout(clickBubbleTimerRef.current);
     };
   }, []);
 
@@ -378,6 +382,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       updateSpeech(null);
     }
 
+    isEmotionFrozenRef.current = false;
+    setIsHoverMuted(true);
+    if (clickBubbleTimerRef.current) clearTimeout(clickBubbleTimerRef.current);
+    clickBubbleTimerRef.current = setTimeout(() => setIsUserTriggered(false), CLICK_BUBBLE_DURATION);
+
     const recentClicks = [...clickTimestampsRef.current, now].filter(
       (timestamp) => now - timestamp <= 10000
     );
@@ -402,6 +411,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    setIsHoverMuted(false);
     if (isSpeakingRef.current) scheduleSpeechEnd(speechDurationRef.current);
     if (activeEmotion) {
       isEmotionFrozenRef.current = false;
@@ -415,7 +425,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const isSpeaking = speech !== null && action !== 'sleep';
   const visibleEmotion = action === 'sleep' ? null : isSpeaking ? speech.emotion : activeEmotion;
   const isDialogVisible =
-    isSpeaking || (visibleEmotion !== null && (isHovered || isFocused || isUserTriggered));
+    isSpeaking ||
+    (visibleEmotion !== null && ((isHovered && !isHoverMuted) || isFocused || isUserTriggered));
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -503,7 +514,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           }`}
           style={spriteSrc ? { backgroundImage: `url("${spriteSrc}")` } : undefined}
           onClick={handleClick}
-          onFocus={() => setIsFocused(true)}
+          onFocus={(event) => setIsFocused(event.currentTarget.matches(':focus-visible'))}
           onBlur={() => setIsFocused(false)}
         />
       </div>

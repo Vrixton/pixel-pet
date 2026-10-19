@@ -8,6 +8,24 @@ import { PixelPet, type PixelPetHandle } from './index';
 const getSprite = (container: HTMLElement) =>
   container.querySelector<HTMLElement>('.pixel-pet-sprite');
 
+const focusWithKeyboard = (element: HTMLElement) => {
+  fireEvent.keyDown(document.body, { key: 'Tab' });
+  act(() => {
+    element.focus();
+  });
+};
+
+const clickWithMouse = (element: HTMLElement) => {
+  fireEvent.mouseEnter(element.parentElement!);
+  fireEvent.pointerDown(element);
+  fireEvent.mouseDown(element);
+  act(() => {
+    element.focus();
+  });
+  fireEvent.mouseUp(element);
+  fireEvent.click(element);
+};
+
 describe('PixelPet', () => {
   it('renders the cat sprite by default', () => {
     const { container } = render(<PixelPet />);
@@ -117,9 +135,7 @@ describe('PixelPet dialog bubble', () => {
     expect(pet.className).toMatch(/pixel-pet-state-(happy|angry|curious)/);
     expect(getDialog(container)).not.toBeInTheDocument();
 
-    act(() => {
-      pet.focus();
-    });
+    focusWithKeyboard(pet);
 
     expect(getDialog(container)).toBeInTheDocument();
   });
@@ -604,9 +620,7 @@ describe('PixelPet messages', () => {
     act(() => {
       vi.advanceTimersByTime(30000);
     });
-    act(() => {
-      pet.focus();
-    });
+    focusWithKeyboard(pet);
 
     expect(pet).toHaveClass('pixel-pet-state-angry');
     expect(getDialog(container)).toHaveTextContent('Danko is feeling overwhelmed!');
@@ -848,5 +862,60 @@ describe('PixelPet onClick', () => {
 
     expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
     expect(pet).not.toHaveClass('pixel-pet-state-happy');
+  });
+});
+
+describe('PixelPet click bubble', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('hides the click bubble after three seconds while the pointer stays on the pet', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    clickWithMouse(pet);
+
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
+
+    advance(2900);
+
+    expect(getDialog(container)).toBeInTheDocument();
+
+    advance(100);
+
+    expect(pet).toHaveClass('pixel-pet-state-happy');
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('keeps automatic emotions silent after a mouse click until the pointer comes back', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    clickWithMouse(pet);
+    advance(30000);
+
+    expect(pet).toHaveFocus();
+    expect(pet.className).toMatch(/pixel-pet-state-(happy|angry|curious)/);
+    expect(getDialog(container)).not.toBeInTheDocument();
+
+    fireEvent.mouseLeave(pet.parentElement!);
+    fireEvent.mouseEnter(pet.parentElement!);
+
+    expect(getDialog(container)).toBeInTheDocument();
   });
 });

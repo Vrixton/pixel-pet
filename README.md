@@ -144,7 +144,7 @@ A sheet passed through `spriteSrc` has to follow the same layout as the bundled 
 
 ## How it behaves
 
-The pet wanders on its own, sometimes walking and sometimes standing, and turns around at the edges of the container. Every 30 seconds it may switch to a random mood for 5 seconds; hovering over it or focusing it with the keyboard shows what it's feeling. Clicking it shows its last mood, and clicking it more than five times in ten seconds makes it angry. After two minutes without mouse, touch, keyboard, or scroll wheel activity on the page, it falls asleep, and any activity wakes it up.
+The pet wanders on its own, sometimes walking and sometimes standing, and turns around at the edges of the container. Every 30 seconds it may switch to a random mood for 5 seconds; hovering over it or focusing it with the keyboard shows what it's feeling. Clicking it shows its last mood for three seconds, and clicking it more than five times in ten seconds makes it angry. After a click, the bubble stays hidden while the pointer rests on the pet; moving the pointer away and back shows it again. After two minutes without mouse, touch, keyboard, or scroll wheel activity on the page, it falls asleep, and any activity wakes it up.
 
 The pet is a real button, so it can be reached with the keyboard, has a visible focus outline, and is announced with its name. When the user prefers reduced motion, it stays still, its animation pauses, and the bubble appears without its pop-in effect.
 
