@@ -35,6 +35,9 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const DIALOG_EDGE_GAP = 4;
 const DIALOG_MAX_WIDTH = 240;
 const SPRITE_MAX_WIDTH = 65;
+const INITIAL_POSITION = 100;
+const WALK_SPEED = 0.04;
+const MAX_FRAME_GAP = 100;
 
 const subscribeToReducedMotion = (onChange: () => void) => {
   if (typeof window.matchMedia !== 'function') return () => {};
@@ -102,7 +105,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
 
-  const [posX, setPosX] = useState<number>(100);
+  const posXRef = useRef<number>(INITIAL_POSITION);
   const [stageWidth, setStageWidth] = useState<number>(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
 
@@ -132,7 +135,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const idleCooldownRef = useRef<boolean>(false);
   const isEmotionFrozenRef = useRef<boolean>(false);
   const emotionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const walkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
@@ -243,43 +245,48 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, [action, canWalk]);
 
-  useEffect(() => {
-    if (action !== 'walk' || activeEmotion !== null || !canWalk) {
-      if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
-      return;
-    }
+  const applyPosition = (x: number) => {
+    posXRef.current = x;
+    if (walkerRef.current) walkerRef.current.style.transform = `translateX(${x}px)`;
+  };
 
-    const speed = 2;
+  useEffect(() => {
+    if (action !== 'walk' || activeEmotion !== null || !canWalk) return;
+
     const minBoundary = 0;
     const maxBoundary = stageWidth - Math.max(size, SPRITE_MAX_WIDTH);
+    if (maxBoundary <= minBoundary) return;
 
-    walkIntervalRef.current = setInterval(() => {
-      setPosX((prevX) => {
-        let nextX = prevX + (direction === 'right' ? speed : -speed);
+    let frameId = 0;
+    let lastTime: number | null = null;
 
-        if (nextX <= minBoundary || nextX >= maxBoundary) {
-          const choice = Math.random() > 0.5 ? 'idle' : 'turn';
+    const step = (time: number) => {
+      const elapsed = lastTime === null ? 0 : Math.min(time - lastTime, MAX_FRAME_GAP);
+      lastTime = time;
+      const nextX = posXRef.current + (direction === 'right' ? 1 : -1) * WALK_SPEED * elapsed;
 
-          if (choice === 'idle') {
-            setAction('idle');
-            idleCooldownRef.current = true;
-            setTimeout(() => {
-              idleCooldownRef.current = false;
-            }, 30000);
-            return prevX;
-          } else {
-            setDirection((prevDir) => (prevDir === 'right' ? 'left' : 'right'));
-            return prevX <= minBoundary ? minBoundary + 2 : maxBoundary - 2;
-          }
+      if (nextX <= minBoundary || nextX >= maxBoundary) {
+        if (Math.random() > 0.5) {
+          setAction('idle');
+          idleCooldownRef.current = true;
+          setTimeout(() => {
+            idleCooldownRef.current = false;
+          }, 30000);
+          return;
         }
 
-        return nextX;
-      });
-    }, 50);
+        applyPosition(nextX <= minBoundary ? minBoundary + 2 : maxBoundary - 2);
+        setDirection((prevDir) => (prevDir === 'right' ? 'left' : 'right'));
+        return;
+      }
 
-    return () => {
-      if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
+      applyPosition(nextX);
+      frameId = requestAnimationFrame(step);
     };
+
+    frameId = requestAnimationFrame(step);
+
+    return () => cancelAnimationFrame(frameId);
   }, [action, activeEmotion, direction, size, canWalk, stageWidth]);
 
   useEffect(() => {
@@ -288,7 +295,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     const updateStageWidth = (width: number) => {
       setStageWidth(width);
-      setPosX((prevX) => Math.max(Math.min(prevX, width - Math.max(size, SPRITE_MAX_WIDTH)), 0));
+      applyPosition(
+        Math.max(Math.min(posXRef.current, width - Math.max(size, SPRITE_MAX_WIDTH)), 0),
+      );
     };
 
     updateStageWidth(stage.clientWidth);
@@ -354,14 +363,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const stageWidth = stage.clientWidth;
     const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
     const dialogWidth = Math.min(dialog.offsetWidth, maxWidth);
-    const petCenter = posX + walker.offsetWidth / 2;
+    const petCenter = posXRef.current + walker.offsetWidth / 2;
     const minLeft = DIALOG_EDGE_GAP;
     const maxLeft = stageWidth - DIALOG_EDGE_GAP - dialogWidth;
     const centeredLeft = petCenter - dialogWidth / 2;
     const left = Math.max(Math.min(centeredLeft, maxLeft), minLeft);
 
-    setDialogPlacement({ left: left - posX, maxWidth });
-  }, [isDialogVisible, visibleEmotion, posX, stageWidth]);
+    setDialogPlacement({ left: left - posXRef.current, maxWidth });
+  }, [isDialogVisible, visibleEmotion, stageWidth]);
 
   const getCurrentStateClass = () => {
     if (visibleEmotion) return `state-${visibleEmotion}`;
@@ -399,7 +408,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       <div
         ref={walkerRef}
         className="pixel-pet-container"
-        style={{ transform: `translateX(${posX}px)` }}
+        style={{ transform: `translateX(${INITIAL_POSITION}px)` }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}>
 

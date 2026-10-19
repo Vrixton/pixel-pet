@@ -1,3 +1,4 @@
+import { Profiler } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -496,5 +497,43 @@ describe('PixelPet container resizing', () => {
 
     expect(Math.max(...positions)).toBeGreaterThan(300);
     expect(Math.max(...positions)).toBeLessThanOrEqual(435);
+  });
+});
+
+describe('PixelPet walking performance', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('moves without re-rendering the component on every step', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    let commits = 0;
+    const { container } = render(
+      <Profiler id="pet" onRender={() => (commits += 1)}>
+        <PixelPet petName="Danko" />
+      </Profiler>,
+    );
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    const startTransform = walker?.style.transform;
+    const commitsBefore = commits;
+
+    for (let step = 0; step < 20; step += 1) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+
+    expect(walker?.style.transform).not.toBe(startTransform);
+    expect(commits - commitsBefore).toBe(0);
   });
 });
