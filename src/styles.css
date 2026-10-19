@@ -28,14 +28,15 @@
 .pixel-pet-dialog {
   padding: 6px 10px;
   font-size: 12px;
-  margin-bottom: 8px;
   min-width: 80px;
+  width: max-content;
+  max-width: 240px;
+  box-sizing: border-box;
   text-align: center;
   animation: petPopIn 0.2s ease-out;
   pointer-events: none;
   position: absolute;
-  top: -55px;
-  white-space: nowrap;
+  bottom: 27px;
   border: 1px solid;
   color: #ffffff;
   box-shadow: none;

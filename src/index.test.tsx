@@ -354,3 +354,71 @@ describe('PixelPet placement', () => {
     expect(Math.max(...positions)).toBeGreaterThan(200);
   });
 });
+
+describe('PixelPet dialog placement', () => {
+  const mockLayout = (stageWidth: number) => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(stageWidth);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('pixel-pet-dialog') ? 180 : 60;
+    });
+  };
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const getDialog = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('.pixel-pet-dialog');
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('centers the bubble over the pet when there is room', () => {
+    mockLayout(300);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)?.style.left).toBe('-60px');
+  });
+
+  it('keeps the bubble inside the container when the pet is at the edge', () => {
+    mockLayout(300);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    for (let step = 0; step < 40; step += 1) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+
+    const positionX = getPositionX(container);
+    expect(positionX).toBeGreaterThan(200);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const dialogLeft = parseFloat(getDialog(container)?.style.left ?? '');
+
+    expect(positionX + dialogLeft + 180).toBe(296);
+  });
+
+  it('limits the bubble width to the container', () => {
+    mockLayout(200);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(getDialog(container)?.style.maxWidth).toBe('192px');
+  });
+});

@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useSyncExternalStore, CSSProperties } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  CSSProperties,
+} from 'react';
 import catSprite from './cat-sprite.png';
 import dogSprite from './dog-sprite.png';
 import './styles.css';
@@ -24,6 +31,9 @@ const SPRITES: Record<PetVariant, string> = {
 const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+const DIALOG_EDGE_GAP = 4;
+const DIALOG_MAX_WIDTH = 240;
 
 const subscribeToReducedMotion = (onChange: () => void) => {
   if (typeof window.matchMedia !== 'function') return () => {};
@@ -83,6 +93,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const prefersReducedMotion = usePrefersReducedMotion();
   const canWalk = walk && !prefersReducedMotion;
   const stageRef = useRef<HTMLDivElement>(null);
+  const walkerRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [dialogPlacement, setDialogPlacement] = useState<{ left: number; maxWidth: number } | null>(null);
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
@@ -307,6 +320,25 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   const visibleEmotion = action === 'sleep' ? null : activeEmotion;
+  const isDialogVisible = visibleEmotion !== null && (isHovered || isFocused || isUserTriggered);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const walker = walkerRef.current;
+    const dialog = dialogRef.current;
+    if (!isDialogVisible || !stage || !walker || !dialog) return;
+
+    const stageWidth = stage.clientWidth;
+    const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
+    const dialogWidth = Math.min(dialog.offsetWidth, maxWidth);
+    const petCenter = posX + walker.offsetWidth / 2;
+    const minLeft = DIALOG_EDGE_GAP;
+    const maxLeft = stageWidth - DIALOG_EDGE_GAP - dialogWidth;
+    const centeredLeft = petCenter - dialogWidth / 2;
+    const left = Math.max(Math.min(centeredLeft, maxLeft), minLeft);
+
+    setDialogPlacement({ left: left - posX, maxWidth });
+  }, [isDialogVisible, visibleEmotion, posX]);
 
   const getCurrentStateClass = () => {
     if (visibleEmotion) return `state-${visibleEmotion}`;
@@ -342,14 +374,25 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   return (
     <div className="pixel-pet" ref={stageRef}>
       <div
+        ref={walkerRef}
         className="pixel-pet-container"
         style={{ transform: `translateX(${posX}px)` }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}>
 
         <div className="pixel-pet-status" role="status">
-          {visibleEmotion && (isHovered || isFocused || isUserTriggered) && (
-            <div className="pixel-pet-dialog" style={getDialogStyle()}>
+          {isDialogVisible && visibleEmotion && (
+            <div
+              ref={dialogRef}
+              className="pixel-pet-dialog"
+              style={{
+                ...getDialogStyle(),
+                ...(dialogPlacement && {
+                  left: dialogPlacement.left,
+                  maxWidth: dialogPlacement.maxWidth,
+                }),
+              }}
+            >
               {emotionMessages[visibleEmotion]}
             </div>
           )}
