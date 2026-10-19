@@ -34,6 +34,7 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 const DIALOG_EDGE_GAP = 4;
 const DIALOG_MAX_WIDTH = 240;
+const SPRITE_MAX_WIDTH = 65;
 
 const subscribeToReducedMotion = (onChange: () => void) => {
   if (typeof window.matchMedia !== 'function') return () => {};
@@ -102,6 +103,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
 
   const [posX, setPosX] = useState<number>(100);
+  const [stageWidth, setStageWidth] = useState<number>(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
 
   const emotionMessages: Record<PetEmotion, React.ReactNode> = {
@@ -249,7 +251,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     const speed = 2;
     const minBoundary = 0;
-    const maxBoundary = (stageRef.current?.clientWidth ?? 0) - size;
+    const maxBoundary = stageWidth - Math.max(size, SPRITE_MAX_WIDTH);
 
     walkIntervalRef.current = setInterval(() => {
       setPosX((prevX) => {
@@ -278,7 +280,28 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
     };
-  }, [action, activeEmotion, direction, size, canWalk]);
+  }, [action, activeEmotion, direction, size, canWalk, stageWidth]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const updateStageWidth = (width: number) => {
+      setStageWidth(width);
+      setPosX((prevX) => Math.max(Math.min(prevX, width - Math.max(size, SPRITE_MAX_WIDTH)), 0));
+    };
+
+    updateStageWidth(stage.clientWidth);
+
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) updateStageWidth(entry.contentRect.width);
+    });
+    observer.observe(stage);
+
+    return () => observer.disconnect();
+  }, [size]);
 
   const handleClick = () => {
     const now = Date.now();
@@ -338,7 +361,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const left = Math.max(Math.min(centeredLeft, maxLeft), minLeft);
 
     setDialogPlacement({ left: left - posX, maxWidth });
-  }, [isDialogVisible, visibleEmotion, posX]);
+  }, [isDialogVisible, visibleEmotion, posX, stageWidth]);
 
   const getCurrentStateClass = () => {
     if (visibleEmotion) return `state-${visibleEmotion}`;

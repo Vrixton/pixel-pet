@@ -422,3 +422,79 @@ describe('PixelPet dialog placement', () => {
     expect(getDialog(container)?.style.maxWidth).toBe('192px');
   });
 });
+
+describe('PixelPet container resizing', () => {
+  let notifyResize: ((width: number) => void) | undefined;
+
+  class MockResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      notifyResize = (width) => {
+        callback(
+          [{ contentRect: { width } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      };
+    }
+
+    observe() {}
+
+    unobserve() {}
+
+    disconnect() {}
+  }
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const resizeTo = (width: number) => {
+    act(() => {
+      notifyResize?.(width);
+    });
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('moves the pet back inside when the container shrinks', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    expect(getPositionX(container)).toBe(100);
+
+    resizeTo(120);
+
+    expect(getPositionX(container)).toBe(55);
+  });
+
+  it('walks across the new width when the container grows', () => {
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.99)
+      .mockReturnValueOnce(0.05)
+      .mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+
+    resizeTo(500);
+
+    const positions: number[] = [];
+    for (let step = 0; step < 100; step += 1) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      positions.push(getPositionX(container));
+    }
+
+    expect(Math.max(...positions)).toBeGreaterThan(300);
+    expect(Math.max(...positions)).toBeLessThanOrEqual(435);
+  });
+});
