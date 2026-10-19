@@ -131,7 +131,7 @@ The highlight classes are `pixel-pet-highlight-pet`, `pixel-pet-highlight-happy`
 | `textColor` | `'#ffffff'` |
 | `borderColor` | Depends on the emotion |
 | `borderWidth` | `'1px'` |
-| `borderRadius` | `'5px'` |
+| `borderRadius` | `'0'` |
 | `fontFamily` | `'monospace'` |
 
 A field set in `emotionDialogStyles` wins over the same field in `dialogStyle`, which wins over the default. Messages from `say()` without an emotion use `dialogStyle`.

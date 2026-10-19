@@ -75,21 +75,21 @@ export interface PixelPetProps {
 
 const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
   happy: {
-    backgroundColor: '#1e1c063d',
+    backgroundColor: '#1e1c06eb',
     borderColor: '#ffeb3b',
   },
   angry: {
-    backgroundColor: '#21090833',
+    backgroundColor: '#210908eb',
     borderColor: '#F04037',
   },
   curious: {
-    backgroundColor: '#1f341d3a',
+    backgroundColor: '#1f341deb',
     borderColor: '#8BE383',
   },
 };
 
 const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
-  backgroundColor: '#05080cd9',
+  backgroundColor: '#05080ceb',
   borderColor: 'var(--pixel-pet-color, #FDDBA0)',
 };
 
@@ -470,7 +470,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       backgroundColor: bgColor,
       color: customEmotionConfig.textColor || dialogStyle.textColor || '#ffffff',
       border: `${customEmotionConfig.borderWidth || dialogStyle.borderWidth || '1px'} solid ${borderColor}`,
-      borderRadius: customEmotionConfig.borderRadius || dialogStyle.borderRadius || '5px',
+      borderRadius: customEmotionConfig.borderRadius || dialogStyle.borderRadius || '0',
       fontFamily: customEmotionConfig.fontFamily || dialogStyle.fontFamily || 'monospace'
     };
   };
