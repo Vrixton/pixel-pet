@@ -159,6 +159,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   if (!hasMenu && isMenuOpen) setIsMenuOpen(false);
   const [menuFocus, setMenuFocus] = useState<PetMenuFocus>('first');
   const isMenuVisible = hasMenu && isMenuOpen;
+  const isMenuVisibleRef = useRef<boolean>(isMenuVisible);
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
@@ -300,10 +301,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, [action]);
 
   useEffect(() => {
+    isMenuVisibleRef.current = isMenuVisible;
+  }, [isMenuVisible]);
+
+  useEffect(() => {
     if (isShowcase) return;
 
     const emotionInterval = setInterval(() => {
-      if (actionRef.current === 'sleep' || isSpeakingRef.current) return;
+      if (actionRef.current === 'sleep' || isSpeakingRef.current || isMenuVisibleRef.current) return;
 
       const emotions: PetEmotion[] = ['happy', 'angry', 'curious'];
       const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -325,7 +330,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, []);
 
   useEffect(() => {
-    if (action === 'sleep' || !canWalk) return;
+    if (action === 'sleep' || !canWalk || isMenuVisible) return;
 
     if (action === 'walk') {
       const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
@@ -354,7 +359,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
-  }, [action, canWalk]);
+  }, [action, canWalk, isMenuVisible]);
 
   const applyPosition = (x: number) => {
     posXRef.current = x;
@@ -362,7 +367,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   useEffect(() => {
-    if (action !== 'walk' || activeEmotion !== null || speech !== null || !canWalk) return;
+    if (action !== 'walk' || activeEmotion !== null || speech !== null || !canWalk || isMenuVisible) return;
 
     const minBoundary = 0;
     const maxBoundary = stageWidth - SPRITE_MAX_WIDTH;
@@ -398,7 +403,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     frameId = requestAnimationFrame(step);
 
     return () => cancelAnimationFrame(frameId);
-  }, [action, activeEmotion, speech, direction, canWalk, stageWidth]);
+  }, [action, activeEmotion, speech, direction, canWalk, stageWidth, isMenuVisible]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -515,10 +520,17 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const isSpeaking = speech !== null && action !== 'sleep';
   const visibleEmotion =
-    action === 'sleep' ? null : isSpeaking ? speech.emotion : isShowcase ? null : activeEmotion;
+    action === 'sleep' || isMenuVisible
+      ? null
+      : isSpeaking
+        ? speech.emotion
+        : isShowcase
+          ? null
+          : activeEmotion;
   const isDialogVisible =
-    isSpeaking ||
-    (visibleEmotion !== null && ((isHovered && !isHoverMuted) || isFocused || isUserTriggered));
+    !isMenuVisible &&
+    (isSpeaking ||
+      (visibleEmotion !== null && ((isHovered && !isHoverMuted) || isFocused || isUserTriggered)));
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -558,6 +570,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, [isMenuVisible, actions, stageWidth]);
 
   const getCurrentStateClass = () => {
+    if (isMenuVisible) return 'pixel-pet-state-idle';
     if (visibleEmotion) return `pixel-pet-state-${visibleEmotion}`;
     if ((!canWalk || isSpeaking) && action === 'walk') return 'pixel-pet-state-idle';
     return `pixel-pet-state-${action}`;

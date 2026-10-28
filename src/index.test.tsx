@@ -1427,3 +1427,78 @@ describe('PixelPet actions menu', () => {
     expect(menu?.style.maxWidth).toBe('192px');
   });
 });
+
+describe('PixelPet while the actions menu is open', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const actions = [{ id: 'chat', label: 'Chat', onSelect: () => {} }];
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  it('stays idle in place, then walks again once the menu closes', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(500);
+    expect(pet).toHaveClass('pixel-pet-state-walk');
+
+    fireEvent.click(pet);
+    const openedAt = getPositionX(container);
+    advance(2000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(getPositionX(container)).toBe(openedAt);
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    advance(500);
+
+    expect(pet).toHaveClass('pixel-pet-state-walk');
+    expect(getPositionX(container)).not.toBe(openedAt);
+  });
+
+  it('skips automatic emotions while the menu is open', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    advance(30000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+  });
+
+  it('hides the speech bubble while the menu is open and shows it again after', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" actions={actions} ref={handle} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    act(() => {
+      handle.current?.say('Hello', { duration: Infinity });
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Hello');
+  });
+});
