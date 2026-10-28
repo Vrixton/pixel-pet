@@ -8,7 +8,7 @@ import React, {
   useSyncExternalStore,
   CSSProperties,
 } from 'react';
-import { PetMenu, type PetMenuAction } from './PetMenu';
+import { PetMenu, type PetMenuAction, type PetMenuFocus } from './PetMenu';
 import './styles.css';
 
 export type { PetMenuAction } from './PetMenu';
@@ -157,6 +157,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [menuPlacement, setMenuPlacement] = useState<{ left: number; maxWidth: number } | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   if (!hasMenu && isMenuOpen) setIsMenuOpen(false);
+  const [menuFocus, setMenuFocus] = useState<PetMenuFocus>('first');
   const isMenuVisible = hasMenu && isMenuOpen;
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
@@ -431,6 +432,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
 
     if (hasMenu) {
+      setMenuFocus('first');
       setIsMenuOpen((open) => !open);
       return;
     }
@@ -476,10 +478,16 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   const handlePetKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!hasMenu) return;
+
     if (event.key === 'Escape' && isMenuVisible) {
       event.preventDefault();
       event.stopPropagation();
       setIsMenuOpen(false);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setMenuFocus(event.key === 'ArrowDown' ? 'first' : 'last');
+      setIsMenuOpen(true);
     }
   };
 
@@ -615,6 +623,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           <PetMenu
             ref={menuRef}
             id={menuId}
+            initialFocus={menuFocus}
             label={fillName(menuLabels?.menu ?? DEFAULT_MENU_LABEL)}
             closeLabel={fillName(menuLabels?.close ?? DEFAULT_CLOSE_LABEL)}
             actions={actions}

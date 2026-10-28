@@ -6,8 +6,11 @@ export interface PetMenuAction {
   onSelect: () => void;
 }
 
+export type PetMenuFocus = 'first' | 'last';
+
 interface PetMenuProps {
   id: string;
+  initialFocus: PetMenuFocus;
   label: string;
   closeLabel: string;
   actions: PetMenuAction[];
@@ -20,6 +23,7 @@ interface PetMenuProps {
 
 export const PetMenu = ({
   id,
+  initialFocus,
   label,
   closeLabel,
   actions,
@@ -31,8 +35,13 @@ export const PetMenu = ({
 }: PetMenuProps) => {
   const listRef = useRef<HTMLUListElement>(null);
 
+  const getItems = () => [
+    ...(listRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
+  ];
+
   useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const items = getItems();
+    items[initialFocus === 'last' ? items.length - 1 : 0]?.focus();
   }, []);
 
   useLayoutEffect(() => {
@@ -42,11 +51,37 @@ export const PetMenu = ({
     };
   }, []);
 
+  const focusItem = (getIndex: (current: number, count: number) => number) => {
+    const items = getItems();
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    items[getIndex(current, items.length)]?.focus();
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape') return;
+    switch (event.key) {
+      case 'Escape':
+        event.stopPropagation();
+        onClose();
+        break;
+      case 'Tab':
+        onClose();
+        break;
+      case 'ArrowDown':
+        focusItem((current, count) => (current + 1) % count);
+        break;
+      case 'ArrowUp':
+        focusItem((current, count) => (current <= 0 ? count - 1 : current - 1));
+        break;
+      case 'Home':
+        focusItem(() => 0);
+        break;
+      case 'End':
+        focusItem((_, count) => count - 1);
+        break;
+      default:
+        return;
+    }
     event.preventDefault();
-    event.stopPropagation();
-    onClose();
   };
 
   return (
@@ -66,6 +101,7 @@ export const PetMenu = ({
             <button
               type="button"
               role="menuitem"
+              tabIndex={-1}
               className="pixel-pet-menu-item"
               onClick={() => onSelect(action)}
             >

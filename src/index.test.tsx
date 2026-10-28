@@ -1309,6 +1309,78 @@ describe('PixelPet actions menu', () => {
     expect(screen.getByRole('button', { name: 'Cerrar el menú de Bit' })).toBeInTheDocument();
   });
 
+  it('moves through the items with the arrow keys, Home, and End', async () => {
+    const user = userEvent.setup();
+    const actions = [...makeActions(), { id: 'theme', label: 'Theme', onSelect: vi.fn() }];
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const item = (name: string) => screen.getByRole('menuitem', { name });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(item('Chat')).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}');
+    expect(item('Rest')).toHaveFocus();
+
+    await user.keyboard('{End}');
+    expect(item('Theme')).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}');
+    expect(item('Chat')).toHaveFocus();
+
+    await user.keyboard('{ArrowUp}');
+    expect(item('Theme')).toHaveFocus();
+
+    await user.keyboard('{Home}');
+    expect(item('Chat')).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(actions[1].onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the items out of the tab order and closes on Tab', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+
+    screen.getAllByRole('menuitem').forEach((item) => expect(item).toHaveAttribute('tabindex', '-1'));
+
+    await user.tab();
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveFocus();
+  });
+
+  it('opens from the pet with ArrowDown on the first item and ArrowUp on the last', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    await user.tab();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'Rest' })).toHaveFocus();
+
+    await user.keyboard('{Escape}{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Chat' })).toHaveFocus();
+  });
+
+  it('leaves the arrow keys alone without actions', async () => {
+    const user = userEvent.setup();
+    const onKeyDown = vi.fn();
+    render(
+      <div onKeyDown={(event) => onKeyDown(event.defaultPrevented)}>
+        <PixelPet petName="Danko" />
+      </div>,
+    );
+
+    await user.tab();
+    await user.keyboard('{ArrowDown}');
+
+    expect(onKeyDown).toHaveBeenCalledWith(false);
+  });
+
   it('names the menu with menuLabels and replaces {name}', () => {
     render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ menu: 'Acciones de {name}' }} />);
 
