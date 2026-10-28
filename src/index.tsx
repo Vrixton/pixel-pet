@@ -1,13 +1,17 @@
 import React, {
   useState,
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
   useSyncExternalStore,
   CSSProperties,
 } from 'react';
+import { PetMenu, type PetMenuAction } from './PetMenu';
 import './styles.css';
+
+export type { PetMenuAction } from './PetMenu';
 
 export interface DialogStyleProps {
   backgroundColor?: string;
@@ -23,6 +27,11 @@ export type PetAction = 'idle' | 'walk' | 'sleep';
 export type PetVariant = 'cat' | 'dog' | 'axolotl' | 'parakeet' | 'hamster';
 export type PetMode = 'live' | 'showcase';
 export type PetMessages = Partial<Record<PetEmotion | 'greeting', React.ReactNode>>;
+
+export interface PetMenuLabels {
+  menu?: string;
+  close?: string;
+}
 
 export interface PetSayOptions {
   emotion?: PetEmotion;
@@ -50,6 +59,7 @@ const DEFAULT_MESSAGES: Record<PetEmotion, string> = {
   curious: '{name} is very **curious**',
 };
 const DEFAULT_GREETING = "Hi, I'm {name}!";
+const DEFAULT_MENU_LABEL = '{name} actions';
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
@@ -87,6 +97,8 @@ export interface PixelPetProps {
   mode?: PetMode;
   walk?: boolean;
   messages?: PetMessages;
+  actions?: PetMenuAction[];
+  menuLabels?: PetMenuLabels;
   dialogStyle?: DialogStyleProps;
   emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -122,6 +134,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   mode = 'live',
   walk = true,
   messages,
+  actions,
+  menuLabels,
   dialogStyle = {},
   emotionDialogStyles = {},
   onClick,
@@ -131,10 +145,18 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const prefersReducedMotion = usePrefersReducedMotion();
   const isShowcase = mode === 'showcase';
   const canWalk = walk && !prefersReducedMotion && !isShowcase;
+  const hasMenu = !isShowcase && actions !== undefined && actions.length > 0;
+  const menuId = useId();
   const stageRef = useRef<HTMLDivElement>(null);
   const walkerRef = useRef<HTMLDivElement>(null);
+  const petRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [dialogPlacement, setDialogPlacement] = useState<{ left: number; maxWidth: number } | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<{ left: number; maxWidth: number } | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  if (!hasMenu && isMenuOpen) setIsMenuOpen(false);
+  const isMenuVisible = hasMenu && isMenuOpen;
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
@@ -147,6 +169,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const posXRef = useRef<number>(INITIAL_POSITION);
   const [stageWidth, setStageWidth] = useState<number>(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
+
+  const fillName = (text: string) => text.split('{name}').join(petName);
 
   const formatMessage = (message: React.ReactNode, emotion: PetEmotion | null): React.ReactNode => {
     if (typeof message !== 'string') return message;
@@ -405,6 +429,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       setAction('idle');
     }
 
+    if (hasMenu) {
+      setIsMenuOpen((open) => !open);
+      return;
+    }
+
     if (isShowcase) {
       updateSpeech({ message: messages?.greeting ?? DEFAULT_GREETING, emotion: null });
       speechDurationRef.current = CLICK_BUBBLE_DURATION;
@@ -433,6 +462,12 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     } else {
       triggerEmotion(lastEmotionRef.current, true);
     }
+  };
+
+  const selectMenuAction = (menuAction: PetMenuAction) => {
+    setIsMenuOpen(false);
+    petRef.current?.focus();
+    menuAction.onSelect();
   };
 
   const handleMouseEnter = () => {
@@ -475,6 +510,18 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     setDialogPlacement({ left: left - posXRef.current, maxWidth });
   }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const walker = walkerRef.current;
+    const menu = menuRef.current;
+    if (!isMenuVisible || !stage || !walker || !menu) return;
+
+    const petCenter = posXRef.current + walker.offsetWidth / 2;
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth);
+
+    setMenuPlacement({ left: left - posXRef.current, maxWidth });
+  }, [isMenuVisible, actions, stageWidth]);
 
   const getCurrentStateClass = () => {
     if (visibleEmotion) return `pixel-pet-state-${visibleEmotion}`;
@@ -538,9 +585,27 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           )}
         </div>
 
+        {isMenuVisible && (
+          <PetMenu
+            ref={menuRef}
+            id={menuId}
+            label={fillName(menuLabels?.menu ?? DEFAULT_MENU_LABEL)}
+            actions={actions}
+            style={{
+              ...getDialogStyle(null),
+              ...(menuPlacement && { left: menuPlacement.left, maxWidth: menuPlacement.maxWidth }),
+            }}
+            onSelect={selectMenuAction}
+          />
+        )}
+
         <button
+          ref={petRef}
           type="button"
-          aria-label={(label ?? petName).split('{name}').join(petName)}
+          aria-label={fillName(label ?? petName)}
+          aria-haspopup={hasMenu ? 'menu' : undefined}
+          aria-expanded={hasMenu ? isMenuVisible : undefined}
+          aria-controls={isMenuVisible ? menuId : undefined}
           className={`pixel-pet-sprite pixel-pet-${variant} ${getCurrentStateClass()} ${
             direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}

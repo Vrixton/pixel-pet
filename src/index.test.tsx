@@ -1097,3 +1097,154 @@ describe('PixelPet showcase mode', () => {
     expect(getDialog(container)).not.toBeInTheDocument();
   });
 });
+
+describe('PixelPet actions menu', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const makeActions = () => [
+    { id: 'chat', label: 'Chat', onSelect: vi.fn() },
+    { id: 'rest', label: 'Rest', onSelect: vi.fn() },
+  ];
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('keeps the 0.4.0 click reaction without actions or with an empty list', () => {
+    const { container, rerender } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).not.toHaveAttribute('aria-haspopup');
+    fireEvent.click(pet);
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
+
+    rerender(<PixelPet petName="Danko" actions={[]} />);
+
+    expect(pet).not.toHaveAttribute('aria-haspopup');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('ignores actions in showcase mode and keeps the greeting', () => {
+    const { container } = render(<PixelPet petName="Danko" mode="showcase" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+
+    expect(pet).not.toHaveAttribute('aria-haspopup');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(getDialog(container)).toHaveTextContent("Hi, I'm Danko!");
+  });
+
+  it('opens a menu with one item per action on click, without an emotion', () => {
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).toHaveAttribute('aria-haspopup', 'menu');
+    expect(pet).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(pet);
+
+    const menu = screen.getByRole('menu', { name: 'Danko actions' });
+    expect(pet).toHaveAttribute('aria-expanded', 'true');
+    expect(pet).toHaveAttribute('aria-controls', menu.id);
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Chat', 'Rest']);
+    expect(pet).not.toHaveClass('pixel-pet-state-happy');
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('calls onSelect, closes the menu, and gives the focus back to the pet', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    actions[1].onSelect.mockImplementation(() => {
+      expect(screen.getByRole('button', { name: 'Danko' })).toHaveFocus();
+    });
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.click(pet);
+    await user.click(screen.getByRole('menuitem', { name: 'Rest' }));
+
+    expect(actions[1].onSelect).toHaveBeenCalledTimes(1);
+    expect(actions[0].onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveAttribute('aria-expanded', 'false');
+    expect(pet).toHaveFocus();
+  });
+
+  it.each(['{Enter}', ' '])('opens with %s and moves the focus to the first item', async (key) => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    await user.tab();
+    await user.keyboard(key);
+
+    expect(screen.getByRole('menuitem', { name: 'Chat' })).toHaveFocus();
+  });
+
+  it('closes when the pet is clicked again', () => {
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    fireEvent.click(pet);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('does not reopen by itself when the actions go away and come back', () => {
+    const actions = makeActions();
+    const { rerender } = render(<PixelPet petName="Danko" actions={actions} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    rerender(<PixelPet petName="Danko" actions={[]} />);
+    rerender(<PixelPet petName="Danko" actions={actions} />);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('names the menu with menuLabels and replaces {name}', () => {
+    render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ menu: 'Acciones de {name}' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(screen.getByRole('menu', { name: 'Acciones de Bit' })).toBeInTheDocument();
+  });
+
+  it('stays closed when onClick prevents the default', () => {
+    render(
+      <PixelPet petName="Danko" actions={makeActions()} onClick={(event) => event.preventDefault()} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('uses the dialog style for the menu', () => {
+    const { container } = render(
+      <PixelPet petName="Danko" actions={makeActions()} dialogStyle={{ backgroundColor: '#123456' }} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(container.querySelector<HTMLElement>('.pixel-pet-menu')?.style.backgroundColor).toBe(
+      'rgb(18, 52, 86)',
+    );
+  });
+
+  it('keeps the menu inside the container like the dialog bubble', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('pixel-pet-menu') ? 180 : 60;
+    });
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(100 + parseFloat(menu?.style.left ?? '') + 180).toBe(196);
+    expect(menu?.style.maxWidth).toBe('192px');
+  });
+});
