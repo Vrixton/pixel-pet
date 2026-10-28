@@ -1,6 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import { PixelPet, type PetMode, type PetVariant, type PixelPetHandle } from './src/index';
+import {
+  PixelPet,
+  type PetMenuAction,
+  type PetMode,
+  type PetVariant,
+  type PixelPetHandle,
+  type RestAt,
+} from './src/index';
 import './src/styles.css';
 import './playground/styles.css';
 
@@ -11,10 +18,11 @@ interface GardenPet {
   name: string;
   color: string;
   mode: PetMode;
+  hasActions?: boolean;
 }
 
 const PETS: GardenPet[] = [
-  { variant: 'cat', species: 'Cat', name: 'Static', color: '#F8C38E', mode: 'live' },
+  { variant: 'cat', species: 'Cat', name: 'Static', color: '#F8C38E', mode: 'live', hasActions: true },
   { variant: 'dog', species: 'Dog', name: 'Danko', color: '#D9925A', mode: 'showcase' },
   { variant: 'axolotl', species: 'Axolotl', name: 'Momo', color: '#F07A9C', mode: 'showcase' },
   { variant: 'parakeet', species: 'Parakeet', name: 'Kiwi', color: '#B8A6F5', mode: 'showcase' },
@@ -24,20 +32,40 @@ const PETS: GardenPet[] = [
 const LIVE_PETS = PETS.filter((pet) => pet.mode === 'live');
 const SHOWCASE_PETS = PETS.filter((pet) => pet.mode === 'showcase');
 
-const Plot = ({ variant, species, name, color }: GardenPet) => {
+const Plot = ({ variant, species, name, color, hasActions }: GardenPet) => {
   const pet = useRef<PixelPetHandle>(null);
+  const [resting, setResting] = useState<RestAt | null>(null);
+
+  const actions: PetMenuAction[] = [
+    { id: 'curious', label: 'Be curious', onSelect: () => pet.current?.emote('curious') },
+    { id: 'rest-left', label: 'Rest on the left', onSelect: () => pet.current?.rest('left') },
+    { id: 'rest-right', label: 'Rest on the right', onSelect: () => pet.current?.rest('right') },
+  ];
 
   return (
     <section className="plot" aria-labelledby={`plot-${variant}`}>
       <div className="sign">
         <h2 id={`plot-${variant}`}>{species}</h2>
         <code>variant="{variant}"</code>
+        {hasActions && <code>resting={resting ? `"${resting}"` : '{null}'}</code>}
         <button type="button" onClick={() => pet.current?.say("Hi, I'm {name}! Nice to **meet** you.")}>
           Say hi
         </button>
       </div>
       <div className="path">
-        <PixelPet ref={pet} petName={name} variant={variant} color={color} />
+        {hasActions ? (
+          <PixelPet
+            ref={pet}
+            petName={name}
+            variant={variant}
+            color={color}
+            actions={actions}
+            resting={resting}
+            onRestingChange={setResting}
+          />
+        ) : (
+          <PixelPet ref={pet} petName={name} variant={variant} color={color} />
+        )}
       </div>
     </section>
   );
@@ -67,7 +95,7 @@ const App = () => (
   <main className="garden">
     <header className="title">
       <h1>PixelPet</h1>
-      <p>Pixel art pets for React. Tap or click a pet to see how it feels.</p>
+      <p>Pixel art pets for React. Tap the cat to open its menu, or the hamster to see how it feels.</p>
       <code className="install">pnpm add @vrixton/pixel-pet</code>
     </header>
     {LIVE_PETS.map((pet) => (
