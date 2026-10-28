@@ -1502,3 +1502,287 @@ describe('PixelPet while the actions menu is open', () => {
     expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Hello');
   });
 });
+
+describe('PixelPet rest', () => {
+  let notifyResize: ((width: number) => void) | undefined;
+
+  class MockResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      notifyResize = (width) => {
+        callback([{ contentRect: { width } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      };
+    }
+
+    observe() {}
+
+    unobserve() {}
+
+    disconnect() {}
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const advance = (ms: number) => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 100) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+  };
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const renderPet = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    const handle = createRef<PixelPetHandle>();
+    const onRestingChange = vi.fn();
+    const view = render(
+      <PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} {...props} />,
+    );
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    const rest = (at: 'left' | 'center' | 'right') => {
+      act(() => {
+        handle.current?.rest(at);
+      });
+    };
+    return { ...view, handle, pet, rest, onRestingChange };
+  };
+
+  it('walks to the spot, falls asleep, and only then reports it', () => {
+    const { container, pet, rest, onRestingChange } = renderPet();
+
+    rest('right');
+
+    expect(pet).toHaveClass('pixel-pet-state-walk');
+    expect(pet).not.toHaveClass('pixel-pet-flip-x');
+
+    advance(1000);
+
+    expect(onRestingChange).not.toHaveBeenCalled();
+    expect(getPositionX(container)).toBeGreaterThan(100);
+
+    advance(3000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(235);
+    expect(onRestingChange).toHaveBeenCalledTimes(1);
+    expect(onRestingChange).toHaveBeenCalledWith('right');
+  });
+
+  it.each([
+    ['left', 0],
+    ['center', 117.5],
+  ] as const)('rests at the %s of its parent', (at, x) => {
+    const { container, pet, rest } = renderPet();
+
+    rest(at);
+    advance(4000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(x);
+  });
+
+  it('only wakes up with a direct click, not with other activity on the page', () => {
+    const { pet, rest, onRestingChange } = renderPet();
+
+    rest('left');
+    advance(4000);
+    onRestingChange.mockClear();
+
+    fireEvent.pointerMove(window);
+    fireEvent.wheel(window);
+    fireEvent.keyDown(window, { key: 'Tab' });
+    advance(200000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+    fireEvent.click(pet);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    expect(onRestingChange).toHaveBeenCalledTimes(1);
+    expect(onRestingChange).toHaveBeenCalledWith(null);
+  });
+
+  it('cancels the trip without reporting anything when clicked on the way', () => {
+    const { container, pet, rest, onRestingChange } = renderPet();
+
+    rest('right');
+    advance(1000);
+    fireEvent.click(pet);
+    const stoppedAt = getPositionX(container);
+    advance(4000);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(stoppedAt);
+    expect(onRestingChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores rest() while resting or on the way', () => {
+    const { container, rest, onRestingChange } = renderPet();
+
+    rest('right');
+    rest('left');
+    advance(4000);
+
+    expect(getPositionX(container)).toBe(235);
+    expect(onRestingChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores say() while resting', () => {
+    const { container, handle, rest } = renderPet();
+
+    rest('right');
+    act(() => {
+      handle.current?.say('Hello');
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+  });
+
+  it('appears asleep at the spot right away when it cannot walk', () => {
+    const { container, pet, rest, onRestingChange } = renderPet({ walk: false });
+
+    rest('right');
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(235);
+    expect(onRestingChange).toHaveBeenCalledWith('right');
+  });
+
+  it('stays at its edge when the parent changes width', () => {
+    const { container, rest } = renderPet();
+
+    rest('right');
+    advance(4000);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500);
+    act(() => {
+      notifyResize?.(500);
+    });
+
+    expect(getPositionX(container)).toBe(435);
+  });
+
+  it('keeps the menu closed for the arrow keys while resting or on the way', () => {
+    const actions = [{ id: 'chat', label: 'Chat', onSelect: () => {} }];
+    const { pet, rest } = renderPet({ actions });
+
+    rest('right');
+    fireEvent.keyDown(pet, { key: 'ArrowDown' });
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    advance(4000);
+    fireEvent.keyDown(pet, { key: 'ArrowUp' });
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+  });
+
+  it('finishes the trip at once when walking is turned off on the way', () => {
+    const { container, pet, rest, rerender, handle, onRestingChange } = renderPet();
+
+    rest('right');
+    advance(500);
+    rerender(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} walk={false} />);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(235);
+  });
+
+  it('ignores rest() and resting in showcase mode', () => {
+    const { pet, rest, onRestingChange } = renderPet({ mode: 'showcase', resting: 'right' });
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+    rest('left');
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(onRestingChange).not.toHaveBeenCalled();
+  });
+
+  describe('when controlled with resting', () => {
+    it('appears already asleep at the spot on the first render, without walking', () => {
+      const { container, pet, onRestingChange } = renderPet({ resting: 'right' });
+
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+      expect(getPositionX(container)).toBe(235);
+      expect(onRestingChange).not.toHaveBeenCalled();
+    });
+
+    it('asks to wake up on click but keeps sleeping until the prop changes', () => {
+      const { pet, rerender, onRestingChange } = renderPet({ resting: 'right' });
+
+      fireEvent.click(pet);
+
+      expect(onRestingChange).toHaveBeenCalledWith(null);
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+      rerender(<PixelPet petName="Danko" resting={null} onRestingChange={onRestingChange} />);
+
+      expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    });
+
+    it('reports the spot after rest() and sleeps once the prop follows, without walking again', () => {
+      const { container, pet, rest, rerender, onRestingChange } = renderPet({ resting: null });
+
+      rest('right');
+      advance(4000);
+
+      expect(onRestingChange).toHaveBeenCalledWith('right');
+      expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+      rerender(<PixelPet petName="Danko" resting="right" onRestingChange={onRestingChange} />);
+
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+      expect(getPositionX(container)).toBe(235);
+    });
+
+    it('walks to the spot again after a canceled trip instead of jumping there', () => {
+      const { container, pet, rest, rerender, handle, onRestingChange } = renderPet({ resting: null });
+      const renderWith = (resting: 'left' | 'right' | null) =>
+        rerender(<PixelPet petName="Danko" ref={handle} resting={resting} onRestingChange={onRestingChange} />);
+
+      rest('right');
+      advance(4000);
+      renderWith('right');
+      fireEvent.click(pet);
+      renderWith(null);
+
+      rest('left');
+      advance(1000);
+      fireEvent.click(pet);
+      const stoppedAt = getPositionX(container);
+      renderWith('right');
+
+      expect(pet).toHaveClass('pixel-pet-state-walk');
+      expect(getPositionX(container)).toBe(stoppedAt);
+    });
+
+    it('walks to a spot set later through the prop, without reporting it back', () => {
+      const { container, pet, rerender, onRestingChange } = renderPet({ resting: null });
+
+      rerender(<PixelPet petName="Danko" resting="left" onRestingChange={onRestingChange} />);
+
+      expect(pet).toHaveClass('pixel-pet-state-walk');
+
+      advance(4000);
+
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+      expect(getPositionX(container)).toBe(0);
+      expect(onRestingChange).not.toHaveBeenCalled();
+    });
+  });
+});
