@@ -1950,3 +1950,86 @@ describe('PixelPet emote()', () => {
     expect(pet).toHaveClass('pixel-pet-state-sleep');
   });
 });
+
+describe('PixelPet insistence anger', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const actions = [{ id: 'chat', label: 'Chat', onSelect: () => {} }];
+
+  it('still gets angry after many clicks without actions, as in 0.4.0', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let click = 0; click < 6; click += 1) {
+      fireEvent.click(pet);
+      advance(500);
+    }
+
+    expect(pet).toHaveClass('pixel-pet-state-angry');
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling overwhelmed!');
+  });
+
+  it('refuses the fourth opening in five seconds with the menu closed and an angry message', () => {
+    const { container } = render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let opening = 0; opening < 3; opening += 1) {
+      fireEvent.click(pet);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      fireEvent.click(pet);
+      advance(500);
+    }
+
+    fireEvent.click(pet);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveClass('pixel-pet-state-angry');
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling overwhelmed!');
+  });
+
+  it('ignores clicks for two seconds after refusing, then opens again', () => {
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let opening = 0; opening < 4; opening += 1) {
+      fireEvent.click(pet);
+      if (opening < 3) fireEvent.click(pet);
+    }
+
+    advance(1900);
+    fireEvent.click(pet);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    advance(100);
+    fireEvent.click(pet);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('does not get angry when the openings are spread out', () => {
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let opening = 0; opening < 6; opening += 1) {
+      fireEvent.click(pet);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      fireEvent.click(pet);
+      advance(2000);
+    }
+
+    expect(pet).not.toHaveClass('pixel-pet-state-angry');
+  });
+});

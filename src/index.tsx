@@ -71,6 +71,9 @@ const MAX_FRAME_GAP = 100;
 const INACTIVITY_DELAY = 120000;
 const NAP_DURATION = 2500;
 const STARTLE_DURATION = 300;
+const MENU_INSIST_OPENS = 4;
+const MENU_INSIST_WINDOW = 5000;
+const MENU_REFUSAL_DURATION = 2000;
 
 const subscribeToReducedMotion = (onChange: () => void) => {
   if (typeof window.matchMedia !== 'function') return () => {};
@@ -244,6 +247,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
   const clickBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuOpenTimestampsRef = useRef<number[]>([]);
+  const menuRefusedUntilRef = useRef<number>(0);
 
   const isSpeakingRef = useRef<boolean>(false);
   const speechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -618,6 +623,39 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  const reactToUser = (emotion: PetEmotion) => {
+    if (isSpeakingRef.current) {
+      clearSpeechTimer();
+      updateSpeech(null);
+    }
+
+    isEmotionFrozenRef.current = false;
+    setIsHoverMuted(true);
+    if (clickBubbleTimerRef.current) clearTimeout(clickBubbleTimerRef.current);
+    clickBubbleTimerRef.current = setTimeout(() => setIsUserTriggered(false), CLICK_BUBBLE_DURATION);
+    triggerEmotion(emotion, true);
+  };
+
+  const openMenu = (focus: PetMenuFocus) => {
+    const now = Date.now();
+    if (now < menuRefusedUntilRef.current) return;
+
+    const recentOpens = [...menuOpenTimestampsRef.current, now].filter(
+      (timestamp) => now - timestamp <= MENU_INSIST_WINDOW,
+    );
+
+    if (recentOpens.length >= MENU_INSIST_OPENS) {
+      menuOpenTimestampsRef.current = [];
+      menuRefusedUntilRef.current = now + MENU_REFUSAL_DURATION;
+      reactToUser('angry');
+      return;
+    }
+
+    menuOpenTimestampsRef.current = recentOpens;
+    setMenuFocus(focus);
+    setIsMenuOpen(true);
+  };
+
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     onClick?.(event);
     if (event.defaultPrevented) return;
@@ -634,8 +672,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
 
     if (hasMenu) {
-      setMenuFocus('first');
-      setIsMenuOpen((open) => !open);
+      if (isMenuVisible) {
+        setIsMenuOpen(false);
+      } else {
+        openMenu('first');
+      }
       return;
     }
 
@@ -646,16 +687,6 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       return;
     }
 
-    if (isSpeakingRef.current) {
-      clearSpeechTimer();
-      updateSpeech(null);
-    }
-
-    isEmotionFrozenRef.current = false;
-    setIsHoverMuted(true);
-    if (clickBubbleTimerRef.current) clearTimeout(clickBubbleTimerRef.current);
-    clickBubbleTimerRef.current = setTimeout(() => setIsUserTriggered(false), CLICK_BUBBLE_DURATION);
-
     const recentClicks = [...clickTimestampsRef.current, now].filter(
       (timestamp) => now - timestamp <= 10000
     );
@@ -663,9 +694,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     if (recentClicks.length > 5) {
       clickTimestampsRef.current = [];
-      triggerEmotion('angry', true);
+      reactToUser('angry');
     } else {
-      triggerEmotion(lastEmotionRef.current, true);
+      reactToUser(lastEmotionRef.current);
     }
   };
 
@@ -686,10 +717,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       event.preventDefault();
       event.stopPropagation();
       setIsMenuOpen(false);
-    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !isMenuVisible) {
       event.preventDefault();
-      setMenuFocus(event.key === 'ArrowDown' ? 'first' : 'last');
-      setIsMenuOpen(true);
+      openMenu(event.key === 'ArrowDown' ? 'first' : 'last');
     }
   };
 
