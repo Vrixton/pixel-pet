@@ -42,6 +42,7 @@ export interface PetSayOptions {
 export interface PixelPetHandle {
   say: (message: React.ReactNode, options?: PetSayOptions) => void;
   hush: () => void;
+  emote: (emotion: PetEmotion) => void;
   rest: (at: RestAt) => void;
 }
 
@@ -245,7 +246,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const speechDurationRef = useRef<number>(DEFAULT_SPEECH_DURATION);
 
   const triggerEmotion = (emotion: PetEmotion, fromUser = false) => {
-    if (action === 'sleep') {
+    if (actionRef.current === 'sleep') {
       setAction('idle');
     }
 
@@ -323,6 +324,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       hush: () => {
         clearSpeechTimer();
         updateSpeech(null);
+      },
+      emote: (emotion) => {
+        if (isShowcase || restStateRef.current) return;
+        triggerEmotion(emotion);
       },
       rest: (at) => {
         if (isShowcase || restStateRef.current) return;

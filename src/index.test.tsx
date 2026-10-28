@@ -1786,3 +1786,65 @@ describe('PixelPet rest', () => {
     });
   });
 });
+
+describe('PixelPet emote()', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const renderPet = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    const handle = createRef<PixelPetHandle>();
+    const view = render(<PixelPet petName="Danko" ref={handle} {...props} />);
+    const emote = (emotion: 'happy' | 'angry' | 'curious') => {
+      act(() => {
+        handle.current?.emote(emotion);
+      });
+    };
+    return { ...view, handle, emote, pet: screen.getByRole('button', { name: 'Danko' }) };
+  };
+
+  it('plays the emotion for five seconds and keeps its message for hover or focus', () => {
+    const { container, emote, pet } = renderPet();
+
+    emote('curious');
+
+    expect(pet).toHaveClass('pixel-pet-state-curious');
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+
+    focusWithKeyboard(pet);
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is very curious');
+
+    act(() => {
+      pet.blur();
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(pet).not.toHaveClass('pixel-pet-state-curious');
+  });
+
+  it('is ignored in showcase mode', () => {
+    const { emote, pet } = renderPet({ mode: 'showcase' });
+
+    emote('angry');
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+  });
+
+  it('is ignored while resting', () => {
+    const { emote, handle, pet } = renderPet({ walk: false });
+
+    act(() => {
+      handle.current?.rest('left');
+    });
+    emote('happy');
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+  });
+});
