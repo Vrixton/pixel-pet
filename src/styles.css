@@ -16,6 +16,10 @@
   pointer-events: auto;
 }
 
+.pixel-pet-startle {
+  animation: pixel-pet-startle 0.3s ease-out;
+}
+
 .pixel-pet-status {
   position: absolute;
   top: 0;
@@ -40,6 +44,65 @@
   border: 1px solid;
   color: #ffffff;
   box-shadow: none;
+}
+
+.pixel-pet-menu {
+  position: absolute;
+  bottom: calc(100% + 27px);
+  z-index: 1;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 120px;
+  max-width: 240px;
+  padding: 4px 26px 4px 4px;
+  font-size: 12px;
+  animation: pixel-pet-pop-in 0.2s ease-out;
+}
+
+.pixel-pet-menu-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pixel-pet-menu-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pixel-pet-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pixel-pet-menu-item:hover,
+.pixel-pet-menu-item:focus-visible {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.pixel-pet-menu-item:focus-visible {
+  outline: 1px solid var(--pixel-pet-color, #FDDBA0);
+  outline-offset: -1px;
 }
 
 .pixel-pet-highlight-pet {
@@ -166,6 +229,11 @@
   100% { background-position: -610px -315px; }
 }
 
+@keyframes pixel-pet-startle {
+  0%, 100% { translate: 0 0; }
+  35% { translate: 0 -3px; }
+}
+
 @keyframes pixel-pet-pop-in {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -177,6 +245,14 @@
   }
 
   .pixel-pet-dialog {
+    animation: none;
+  }
+
+  .pixel-pet-menu {
+    animation: none;
+  }
+
+  .pixel-pet-startle {
     animation: none;
   }
 }

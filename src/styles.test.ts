@@ -29,4 +29,20 @@ describe('component stylesheet', () => {
     expect(reducedMotionBlock).toMatch(/\.pixel-pet-sprite\s*\{[^}]*animation-play-state:\s*paused/);
     expect(reducedMotionBlock).toMatch(/\.pixel-pet-dialog\s*\{[^}]*animation:\s*none/);
   });
+
+  it('skips the menu animation for reduced motion', () => {
+    const reducedMotionBlock = componentStyles.slice(
+      componentStyles.indexOf('@media (prefers-reduced-motion: reduce)'),
+    );
+
+    expect(reducedMotionBlock).toMatch(/\.pixel-pet-menu\s*\{[^}]*animation:\s*none/);
+  });
+
+  it('skips the startle hop for reduced motion', () => {
+    const reducedMotionBlock = componentStyles.slice(
+      componentStyles.indexOf('@media (prefers-reduced-motion: reduce)'),
+    );
+
+    expect(reducedMotionBlock).toMatch(/\.pixel-pet-startle\s*\{[^}]*animation:\s*none/);
+  });
 });

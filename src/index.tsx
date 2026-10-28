@@ -1,13 +1,17 @@
 import React, {
   useState,
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
   useSyncExternalStore,
   CSSProperties,
 } from 'react';
+import { PetMenu, type PetMenuAction, type PetMenuFocus } from './PetMenu';
 import './styles.css';
+
+export type { PetMenuAction } from './PetMenu';
 
 export interface DialogStyleProps {
   backgroundColor?: string;
@@ -23,6 +27,12 @@ export type PetAction = 'idle' | 'walk' | 'sleep';
 export type PetVariant = 'cat' | 'dog' | 'axolotl' | 'parakeet' | 'hamster';
 export type PetMode = 'live' | 'showcase';
 export type PetMessages = Partial<Record<PetEmotion | 'greeting', React.ReactNode>>;
+export type RestAt = 'left' | 'center' | 'right';
+
+export interface PetMenuLabels {
+  menu?: string;
+  close?: string;
+}
 
 export interface PetSayOptions {
   emotion?: PetEmotion;
@@ -32,6 +42,8 @@ export interface PetSayOptions {
 export interface PixelPetHandle {
   say: (message: React.ReactNode, options?: PetSayOptions) => void;
   hush: () => void;
+  emote: (emotion: PetEmotion) => void;
+  rest: (at: RestAt) => void;
 }
 
 const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
@@ -50,10 +62,18 @@ const DEFAULT_MESSAGES: Record<PetEmotion, string> = {
   curious: '{name} is very **curious**',
 };
 const DEFAULT_GREETING = "Hi, I'm {name}!";
+const DEFAULT_MENU_LABEL = '{name} actions';
+const DEFAULT_CLOSE_LABEL = 'Close menu';
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
 const MAX_FRAME_GAP = 100;
+const INACTIVITY_DELAY = 120000;
+const NAP_DURATION = 2500;
+const STARTLE_DURATION = 300;
+const MENU_INSIST_OPENS = 4;
+const MENU_INSIST_WINDOW = 5000;
+const MENU_REFUSAL_DURATION = 2000;
 
 const subscribeToReducedMotion = (onChange: () => void) => {
   if (typeof window.matchMedia !== 'function') return () => {};
@@ -68,6 +88,29 @@ const getPrefersReducedMotion = () =>
 const usePrefersReducedMotion = () =>
   useSyncExternalStore(subscribeToReducedMotion, getPrefersReducedMotion, () => false);
 
+const getRestX = (at: RestAt, stageWidth: number) => {
+  const maxX = Math.max(stageWidth - SPRITE_MAX_WIDTH, 0);
+  if (at === 'left') return 0;
+  if (at === 'right') return maxX;
+  return maxX / 2;
+};
+
+interface RestState {
+  at: RestAt;
+  phase: 'walking' | 'asleep';
+  origin: 'method' | 'prop';
+}
+
+const getContainedPlacement = (stageWidth: number, anchorCenter: number, boxWidth: number) => {
+  const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
+  const width = Math.min(boxWidth, maxWidth);
+  const minLeft = DIALOG_EDGE_GAP;
+  const maxLeft = stageWidth - DIALOG_EDGE_GAP - width;
+  const left = Math.max(Math.min(anchorCenter - width / 2, maxLeft), minLeft);
+
+  return { left, maxWidth };
+};
+
 export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
@@ -77,6 +120,10 @@ export interface PixelPetProps {
   mode?: PetMode;
   walk?: boolean;
   messages?: PetMessages;
+  actions?: PetMenuAction[];
+  menuLabels?: PetMenuLabels;
+  resting?: RestAt | null;
+  onRestingChange?: (at: RestAt | null) => void;
   dialogStyle?: DialogStyleProps;
   emotionDialogStyles?: Partial<Record<PetEmotion, DialogStyleProps>>;
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -104,7 +151,7 @@ const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
 };
 
 export const PixelPet: React.FC<PixelPetProps> = ({
-  petName = 'Static',
+  petName = 'Minerva',
   variant = 'cat',
   spriteSrc,
   color,
@@ -112,6 +159,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   mode = 'live',
   walk = true,
   messages,
+  actions,
+  menuLabels,
+  resting,
+  onRestingChange,
   dialogStyle = {},
   emotionDialogStyles = {},
   onClick,
@@ -121,15 +172,37 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const prefersReducedMotion = usePrefersReducedMotion();
   const isShowcase = mode === 'showcase';
   const canWalk = walk && !prefersReducedMotion && !isShowcase;
+  const hasMenu = !isShowcase && actions !== undefined && actions.length > 0;
+  const menuId = useId();
   const stageRef = useRef<HTMLDivElement>(null);
   const walkerRef = useRef<HTMLDivElement>(null);
+  const petRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [dialogPlacement, setDialogPlacement] = useState<{ left: number; maxWidth: number } | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<{ left: number; maxWidth: number } | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  if (!hasMenu && isMenuOpen) setIsMenuOpen(false);
+  const [menuFocus, setMenuFocus] = useState<PetMenuFocus>('first');
+  const isMenuVisible = hasMenu && isMenuOpen;
+  const isMenuVisibleRef = useRef<boolean>(isMenuVisible);
+  const isRestingControlled = resting !== undefined;
+  const [restState, setRestState] = useState<RestState | null>(() =>
+    isRestingControlled && resting !== null && !isShowcase
+      ? { at: resting, phase: 'asleep', origin: 'prop' }
+      : null,
+  );
+  const restStateRef = useRef<RestState | null>(restState);
+  const isResting = restState !== null;
+  const standingAtRef = useRef<RestAt | null>(null);
+  const previousRestingRef = useRef<RestAt | null | undefined>(resting);
+  const onRestingChangeRef = useRef(onRestingChange);
   const [activeEmotion, setActiveEmotion] = useState<PetEmotion | null>(null);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
   const [isHoverMuted, setIsHoverMuted] = useState<boolean>(false);
+  const [isStartled, setIsStartled] = useState<boolean>(false);
   const [speech, setSpeech] = useState<{ message: React.ReactNode; emotion: PetEmotion | null } | null>(
     null,
   );
@@ -137,6 +210,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const posXRef = useRef<number>(INITIAL_POSITION);
   const [stageWidth, setStageWidth] = useState<number>(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
+
+  const fillName = (text: string) => text.split('{name}').join(petName);
 
   const formatMessage = (message: React.ReactNode, emotion: PetEmotion | null): React.ReactNode => {
     if (typeof message !== 'string') return message;
@@ -172,13 +247,15 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const lastEmotionRef = useRef<PetEmotion>('happy');
   const clickTimestampsRef = useRef<number[]>([]);
   const clickBubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuOpenTimestampsRef = useRef<number[]>([]);
+  const menuRefusedUntilRef = useRef<number>(0);
 
   const isSpeakingRef = useRef<boolean>(false);
   const speechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechDurationRef = useRef<number>(DEFAULT_SPEECH_DURATION);
 
   const triggerEmotion = (emotion: PetEmotion, fromUser = false) => {
-    if (action === 'sleep') {
+    if (actionRef.current === 'sleep') {
       setAction('idle');
     }
 
@@ -202,6 +279,37 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     setSpeech(value);
   };
 
+  const updateRestState = (value: RestState | null) => {
+    restStateRef.current = value;
+    standingAtRef.current = null;
+    setRestState(value);
+  };
+
+  const arriveAt = ({ at, origin }: RestState) => {
+    if (origin === 'prop') {
+      updateRestState({ at, phase: 'asleep', origin });
+      return;
+    }
+
+    if (isRestingControlled) {
+      updateRestState(null);
+      standingAtRef.current = at;
+    } else {
+      updateRestState({ at, phase: 'asleep', origin });
+    }
+    onRestingChangeRef.current?.(at);
+  };
+
+  const wakeFromRest = (state: RestState) => {
+    if (state.phase === 'walking' && state.origin === 'method') {
+      updateRestState(null);
+      return;
+    }
+
+    if (!isRestingControlled) updateRestState(null);
+    onRestingChangeRef.current?.(null);
+  };
+
   const clearSpeechTimer = () => {
     if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
   };
@@ -216,6 +324,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     ref,
     () => ({
       say: (message, options = {}) => {
+        if (restStateRef.current) return;
         setAction((prevAction) => (prevAction === 'sleep' ? 'idle' : prevAction));
         updateSpeech({ message, emotion: options.emotion ?? null });
         speechDurationRef.current = options.duration ?? DEFAULT_SPEECH_DURATION;
@@ -225,25 +334,86 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         clearSpeechTimer();
         updateSpeech(null);
       },
+      emote: (emotion) => {
+        if (isShowcase || restStateRef.current) return;
+        triggerEmotion(emotion);
+      },
+      rest: (at) => {
+        if (isShowcase || restStateRef.current) return;
+
+        const trip: RestState = { at, phase: 'walking', origin: 'method' };
+        if (canWalk) {
+          updateRestState(trip);
+          return;
+        }
+
+        applyPosition(getRestX(at, stageRef.current?.clientWidth ?? 0));
+        arriveAt(trip);
+      },
     }),
-    [],
+    [isShowcase, canWalk, isRestingControlled],
   );
+
+  useLayoutEffect(() => {
+    onRestingChangeRef.current = onRestingChange;
+  });
+
+  useLayoutEffect(() => {
+    if (previousRestingRef.current === resting) return;
+    previousRestingRef.current = resting;
+    if (!isRestingControlled || isShowcase) return;
+
+    if (resting === null) {
+      updateRestState(null);
+      return;
+    }
+
+    const isThere = standingAtRef.current === resting || !canWalk;
+    updateRestState({ at: resting, phase: isThere ? 'asleep' : 'walking', origin: 'prop' });
+  }, [resting]);
+
+  useEffect(() => {
+    if (!isResting) return;
+
+    clearSpeechTimer();
+    updateSpeech(null);
+    setActiveEmotion(null);
+    setIsMenuOpen(false);
+    setAction('idle');
+  }, [isResting]);
 
   useEffect(() => {
     let inactivityTimer: ReturnType<typeof setTimeout>;
+    let napTimer: ReturnType<typeof setTimeout>;
+    let startleTimer: ReturnType<typeof setTimeout>;
+
+    const fallAsleep = () => {
+      setActiveEmotion(null);
+      updateSpeech(null);
+      setAction('sleep');
+    };
+
+    const nap = () => {
+      inactivityTimer = setTimeout(nap, INACTIVITY_DELAY);
+      if (restStateRef.current || isMenuVisibleRef.current || isSpeakingRef.current) return;
+
+      setActiveEmotion(null);
+      setAction('sleep');
+      napTimer = setTimeout(() => {
+        if (actionRef.current !== 'sleep') return;
+        setAction('idle');
+        setIsStartled(true);
+        startleTimer = setTimeout(() => setIsStartled(false), STARTLE_DURATION);
+      }, NAP_DURATION);
+    };
 
     const resetInactivity = () => {
-      setAction((prevAction) => {
-        if (prevAction === 'sleep') return 'idle';
-        return prevAction;
-      });
+      if (isShowcase) {
+        setAction((prevAction) => (prevAction === 'sleep' ? 'idle' : prevAction));
+      }
 
       clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        setActiveEmotion(null);
-        updateSpeech(null);
-        setAction('sleep');
-      }, 120000);
+      inactivityTimer = setTimeout(isShowcase ? fallAsleep : nap, INACTIVITY_DELAY);
     };
 
     ACTIVITY_EVENTS.forEach((event) => {
@@ -253,21 +423,34 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     return () => {
       clearTimeout(inactivityTimer);
+      clearTimeout(napTimer);
+      clearTimeout(startleTimer);
       ACTIVITY_EVENTS.forEach((event) => {
         window.removeEventListener(event, resetInactivity);
       });
     };
-  }, []);
+  }, [isShowcase]);
 
   useEffect(() => {
     actionRef.current = action;
   }, [action]);
 
   useEffect(() => {
+    isMenuVisibleRef.current = isMenuVisible;
+  }, [isMenuVisible]);
+
+  useEffect(() => {
     if (isShowcase) return;
 
     const emotionInterval = setInterval(() => {
-      if (actionRef.current === 'sleep' || isSpeakingRef.current) return;
+      if (
+        actionRef.current === 'sleep' ||
+        isSpeakingRef.current ||
+        isMenuVisibleRef.current ||
+        restStateRef.current
+      ) {
+        return;
+      }
 
       const emotions: PetEmotion[] = ['happy', 'angry', 'curious'];
       const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -289,7 +472,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, []);
 
   useEffect(() => {
-    if (action === 'sleep' || !canWalk) return;
+    if (action === 'sleep' || !canWalk || isMenuVisible || isResting) return;
 
     if (action === 'walk') {
       const walkDuration = Math.floor(Math.random() * (180000 - 5000 + 1)) + 5000;
@@ -305,6 +488,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     } else {
       const decideNextAction = () => {
         if (!idleCooldownRef.current && Math.random() > 0.4) {
+          standingAtRef.current = null;
           setAction('walk');
           return;
         }
@@ -318,7 +502,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
-  }, [action, canWalk]);
+  }, [action, canWalk, isMenuVisible, isResting]);
 
   const applyPosition = (x: number) => {
     posXRef.current = x;
@@ -326,7 +510,16 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   useEffect(() => {
-    if (action !== 'walk' || activeEmotion !== null || speech !== null || !canWalk) return;
+    if (
+      action !== 'walk' ||
+      activeEmotion !== null ||
+      speech !== null ||
+      !canWalk ||
+      isMenuVisible ||
+      isResting
+    ) {
+      return;
+    }
 
     const minBoundary = 0;
     const maxBoundary = stageWidth - SPRITE_MAX_WIDTH;
@@ -362,13 +555,58 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     frameId = requestAnimationFrame(step);
 
     return () => cancelAnimationFrame(frameId);
-  }, [action, activeEmotion, speech, direction, canWalk, stageWidth]);
+  }, [action, activeEmotion, speech, direction, canWalk, stageWidth, isMenuVisible, isResting]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (restState?.phase !== 'walking' || !stage) return;
+
+    const targetX = getRestX(restState.at, stage.clientWidth);
+    if (!canWalk) {
+      applyPosition(targetX);
+      arriveAt(restState);
+      return;
+    }
+
+    setDirection(targetX >= posXRef.current ? 'right' : 'left');
+
+    let frameId = 0;
+    let lastTime: number | null = null;
+
+    const step = (time: number) => {
+      const elapsed = lastTime === null ? 0 : Math.min(time - lastTime, MAX_FRAME_GAP);
+      lastTime = time;
+      const distance = targetX - posXRef.current;
+      const stride = WALK_SPEED * elapsed;
+
+      if (Math.abs(distance) <= stride) {
+        applyPosition(targetX);
+        arriveAt(restState);
+        return;
+      }
+
+      applyPosition(posXRef.current + Math.sign(distance) * stride);
+      frameId = requestAnimationFrame(step);
+    };
+
+    frameId = requestAnimationFrame(step);
+
+    return () => cancelAnimationFrame(frameId);
+  }, [restState, stageWidth, canWalk]);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (restState?.phase !== 'asleep' || !stage) return;
+
+    applyPosition(getRestX(restState.at, stage.clientWidth));
+  }, [restState, stageWidth]);
 
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
 
     const updateStageWidth = (width: number) => {
+      standingAtRef.current = null;
       setStageWidth(width);
       applyPosition(Math.max(Math.min(posXRef.current, width - SPRITE_MAX_WIDTH), 0));
     };
@@ -385,23 +623,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    onClick?.(event);
-    if (event.defaultPrevented) return;
-
-    const now = Date.now();
-
-    if (action === 'sleep') {
-      setAction('idle');
-    }
-
-    if (isShowcase) {
-      updateSpeech({ message: messages?.greeting ?? DEFAULT_GREETING, emotion: null });
-      speechDurationRef.current = CLICK_BUBBLE_DURATION;
-      scheduleSpeechEnd(CLICK_BUBBLE_DURATION);
-      return;
-    }
-
+  const reactToUser = (emotion: PetEmotion) => {
     if (isSpeakingRef.current) {
       clearSpeechTimer();
       updateSpeech(null);
@@ -411,6 +633,59 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     setIsHoverMuted(true);
     if (clickBubbleTimerRef.current) clearTimeout(clickBubbleTimerRef.current);
     clickBubbleTimerRef.current = setTimeout(() => setIsUserTriggered(false), CLICK_BUBBLE_DURATION);
+    triggerEmotion(emotion, true);
+  };
+
+  const openMenu = (focus: PetMenuFocus) => {
+    const now = Date.now();
+    if (now < menuRefusedUntilRef.current) return;
+
+    const recentOpens = [...menuOpenTimestampsRef.current, now].filter(
+      (timestamp) => now - timestamp <= MENU_INSIST_WINDOW,
+    );
+
+    if (recentOpens.length >= MENU_INSIST_OPENS) {
+      menuOpenTimestampsRef.current = [];
+      menuRefusedUntilRef.current = now + MENU_REFUSAL_DURATION;
+      reactToUser('angry');
+      return;
+    }
+
+    menuOpenTimestampsRef.current = recentOpens;
+    setMenuFocus(focus);
+    setIsMenuOpen(true);
+  };
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    onClick?.(event);
+    if (event.defaultPrevented) return;
+
+    if (restState) {
+      wakeFromRest(restState);
+      return;
+    }
+
+    const now = Date.now();
+
+    if (action === 'sleep') {
+      setAction('idle');
+    }
+
+    if (hasMenu) {
+      if (isMenuVisible) {
+        setIsMenuOpen(false);
+      } else {
+        openMenu('first');
+      }
+      return;
+    }
+
+    if (isShowcase) {
+      updateSpeech({ message: messages?.greeting ?? DEFAULT_GREETING, emotion: null });
+      speechDurationRef.current = CLICK_BUBBLE_DURATION;
+      scheduleSpeechEnd(CLICK_BUBBLE_DURATION);
+      return;
+    }
 
     const recentClicks = [...clickTimestampsRef.current, now].filter(
       (timestamp) => now - timestamp <= 10000
@@ -419,13 +694,37 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     if (recentClicks.length > 5) {
       clickTimestampsRef.current = [];
-      triggerEmotion('angry', true);
+      reactToUser('angry');
     } else {
-      triggerEmotion(lastEmotionRef.current, true);
+      reactToUser(lastEmotionRef.current);
     }
   };
 
-  const handleMouseEnter = () => {
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+    petRef.current?.focus();
+  };
+
+  const selectMenuAction = (menuAction: PetMenuAction) => {
+    closeMenu();
+    menuAction.onSelect();
+  };
+
+  const handlePetKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!hasMenu || restState) return;
+
+    if (event.key === 'Escape' && isMenuVisible) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsMenuOpen(false);
+    } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !isMenuVisible) {
+      event.preventDefault();
+      openMenu(event.key === 'ArrowDown' ? 'first' : 'last');
+    }
+  };
+
+  const handlePointerEnter = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     setIsHovered(true);
     if (isSpeakingRef.current) clearSpeechTimer();
     if (activeEmotion) {
@@ -434,7 +733,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     setIsHovered(false);
     setIsHoverMuted(false);
     if (isSpeakingRef.current) scheduleSpeechEnd(speechDurationRef.current);
@@ -447,12 +747,19 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  const isSpeaking = speech !== null && action !== 'sleep';
+  const isSpeaking = speech !== null && action !== 'sleep' && !isResting;
   const visibleEmotion =
-    action === 'sleep' ? null : isSpeaking ? speech.emotion : isShowcase ? null : activeEmotion;
+    action === 'sleep' || isMenuVisible || isResting
+      ? null
+      : isSpeaking
+        ? speech.emotion
+        : isShowcase
+          ? null
+          : activeEmotion;
   const isDialogVisible =
-    isSpeaking ||
-    (visibleEmotion !== null && ((isHovered && !isHoverMuted) || isFocused || isUserTriggered));
+    !isMenuVisible &&
+    (isSpeaking ||
+      (visibleEmotion !== null && ((isHovered && !isHoverMuted) || isFocused || isUserTriggered)));
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -460,19 +767,40 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const dialog = dialogRef.current;
     if (!isDialogVisible || !stage || !walker || !dialog) return;
 
-    const stageWidth = stage.clientWidth;
-    const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
-    const dialogWidth = Math.min(dialog.offsetWidth, maxWidth);
     const petCenter = posXRef.current + walker.offsetWidth / 2;
-    const minLeft = DIALOG_EDGE_GAP;
-    const maxLeft = stageWidth - DIALOG_EDGE_GAP - dialogWidth;
-    const centeredLeft = petCenter - dialogWidth / 2;
-    const left = Math.max(Math.min(centeredLeft, maxLeft), minLeft);
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, dialog.offsetWidth);
 
     setDialogPlacement({ left: left - posXRef.current, maxWidth });
   }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
 
+  useEffect(() => {
+    if (!isMenuVisible) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || petRef.current?.contains(target)) return;
+      setIsMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer, true);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointer, true);
+  }, [isMenuVisible]);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const walker = walkerRef.current;
+    const menu = menuRef.current;
+    if (!isMenuVisible || !stage || !walker || !menu) return;
+
+    const petCenter = posXRef.current + walker.offsetWidth / 2;
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth);
+
+    setMenuPlacement({ left: left - posXRef.current, maxWidth });
+  }, [isMenuVisible, actions, stageWidth]);
+
   const getCurrentStateClass = () => {
+    if (restState) return restState.phase === 'walking' ? 'pixel-pet-state-walk' : 'pixel-pet-state-sleep';
+    if (isMenuVisible) return 'pixel-pet-state-idle';
     if (visibleEmotion) return `pixel-pet-state-${visibleEmotion}`;
     if ((!canWalk || isSpeaking) && action === 'walk') return 'pixel-pet-state-idle';
     return `pixel-pet-state-${action}`;
@@ -509,10 +837,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     >
       <div
         ref={walkerRef}
-        className="pixel-pet-container"
+        className={`pixel-pet-container${isStartled ? ' pixel-pet-startle' : ''}`}
         style={{ transform: `translateX(${INITIAL_POSITION}px)` }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}>
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}>
 
         <div className="pixel-pet-status" role="status">
           {isDialogVisible && (
@@ -534,14 +862,37 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           )}
         </div>
 
+        {isMenuVisible && (
+          <PetMenu
+            ref={menuRef}
+            id={menuId}
+            initialFocus={menuFocus}
+            label={fillName(menuLabels?.menu ?? DEFAULT_MENU_LABEL)}
+            closeLabel={fillName(menuLabels?.close ?? DEFAULT_CLOSE_LABEL)}
+            actions={actions}
+            style={{
+              ...getDialogStyle(null),
+              ...(menuPlacement && { left: menuPlacement.left, maxWidth: menuPlacement.maxWidth }),
+            }}
+            onSelect={selectMenuAction}
+            onClose={closeMenu}
+            restoreFocus={() => petRef.current?.focus()}
+          />
+        )}
+
         <button
+          ref={petRef}
           type="button"
-          aria-label={(label ?? petName).split('{name}').join(petName)}
+          aria-label={fillName(label ?? petName)}
+          aria-haspopup={hasMenu ? 'menu' : undefined}
+          aria-expanded={hasMenu ? isMenuVisible : undefined}
+          aria-controls={isMenuVisible ? menuId : undefined}
           className={`pixel-pet-sprite pixel-pet-${variant} ${getCurrentStateClass()} ${
             direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}
           style={spriteSrc ? { backgroundImage: `url("${spriteSrc}")` } : undefined}
           onClick={handleClick}
+          onKeyDown={handlePetKeyDown}
           onFocus={(event) => setIsFocused(event.currentTarget.matches(':focus-visible'))}
           onBlur={() => setIsFocused(false)}
         />

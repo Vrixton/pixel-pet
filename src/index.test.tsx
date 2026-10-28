@@ -16,7 +16,7 @@ const focusWithKeyboard = (element: HTMLElement) => {
 };
 
 const clickWithMouse = (element: HTMLElement) => {
-  fireEvent.mouseEnter(element.parentElement!);
+  fireEvent.pointerEnter(element.parentElement!, { pointerType: 'mouse' });
   fireEvent.pointerDown(element);
   fireEvent.mouseDown(element);
   act(() => {
@@ -141,7 +141,7 @@ describe('PixelPet dialog bubble', () => {
   });
 });
 
-describe('PixelPet sleep', () => {
+describe('PixelPet nap', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -158,23 +158,39 @@ describe('PixelPet sleep', () => {
     });
   };
 
-  const renderAndSleep = () => {
-    render(<PixelPet petName="Danko" />);
-    advance(1000);
-    fireEvent.pointerMove(window);
-    advance(120000);
-    const pet = screen.getByRole('button', { name: 'Danko' });
-    expect(pet).toHaveClass('pixel-pet-state-sleep');
-    return pet;
+  const renderPet = () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    return {
+      pet: screen.getByRole('button', { name: 'Danko' }),
+      walker: container.querySelector<HTMLElement>('.pixel-pet-container')!,
+    };
   };
 
-  it('falls asleep two minutes after the last activity', () => {
-    renderAndSleep();
+  it('naps for a moment two minutes after the last activity and wakes up with a startle', () => {
+    const { pet, walker } = renderPet();
+
+    advance(1000);
+    fireEvent.pointerMove(window);
+    advance(119900);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+    advance(100);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+    advance(2500);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(walker).toHaveClass('pixel-pet-startle');
+
+    advance(300);
+
+    expect(walker).not.toHaveClass('pixel-pet-startle');
   });
 
   it('counts keyboard activity and stays awake', () => {
-    render(<PixelPet petName="Danko" />);
-    const pet = screen.getByRole('button', { name: 'Danko' });
+    const { pet } = renderPet();
 
     advance(1000);
     fireEvent.keyDown(window, { key: 'Tab' });
@@ -185,18 +201,57 @@ describe('PixelPet sleep', () => {
     expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 
-  it('wakes up with a key press', () => {
-    const pet = renderAndSleep();
+  it('no longer stays asleep after two minutes without activity', () => {
+    const { pet } = renderPet();
 
-    fireEvent.keyDown(window, { key: 'Tab' });
+    advance(120000);
+    advance(5000);
 
     expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 
-  it('wakes up with a touch anywhere on the page', () => {
-    const pet = renderAndSleep();
+  it('naps again every two minutes while there is no activity', () => {
+    const { pet } = renderPet();
 
-    fireEvent.pointerDown(window, { pointerType: 'touch' });
+    advance(120000);
+    advance(2500);
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+    advance(120000 - 2500);
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+  });
+
+  it('wakes up early without a startle when tapped', () => {
+    const { pet, walker } = renderPet();
+
+    advance(120000);
+    fireEvent.click(pet);
+    advance(2500);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    expect(walker).not.toHaveClass('pixel-pet-startle');
+  });
+
+  it('skips the nap while the actions menu is open', () => {
+    render(<PixelPet petName="Danko" actions={[{ id: 'chat', label: 'Chat', onSelect: () => {} }]} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    advance(120000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('skips the nap while speaking', () => {
+    const handle = createRef<PixelPetHandle>();
+    render(<PixelPet petName="Danko" ref={handle} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    act(() => {
+      handle.current?.say('Still here', { duration: Infinity });
+    });
+    advance(120000);
 
     expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
@@ -332,7 +387,7 @@ describe('PixelPet emotions', () => {
     expect(pet).toHaveClass('pixel-pet-state-idle');
   });
 
-  it('stays asleep when falling asleep and an automatic emotion happen at the same time', () => {
+  it('keeps napping when the nap and an automatic emotion happen at the same time', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
@@ -340,7 +395,7 @@ describe('PixelPet emotions', () => {
     advance(120000);
     expect(pet).toHaveClass('pixel-pet-state-sleep');
 
-    advance(10000);
+    advance(2000);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
   });
@@ -701,8 +756,8 @@ describe('PixelPet say()', () => {
 
     say('Ask me anything.', { duration: Infinity });
     advance(50000);
-    fireEvent.mouseEnter(pet.parentElement!);
-    fireEvent.mouseLeave(pet.parentElement!);
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'mouse' });
+    fireEvent.pointerLeave(pet.parentElement!, { pointerType: 'mouse' });
     advance(50000);
 
     expect(getDialog(container)).toHaveTextContent('Ask me anything.');
@@ -865,6 +920,53 @@ describe('PixelPet onClick', () => {
   });
 });
 
+describe('PixelPet hover', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const showEmotion = () => {
+    const handle = createRef<PixelPetHandle>();
+    const view = render(<PixelPet petName="Danko" ref={handle} />);
+    act(() => {
+      handle.current?.emote('happy');
+    });
+    return { ...view, pet: screen.getByRole('button', { name: 'Danko' }) };
+  };
+
+  it.each(['mouse', 'pen'])('shows the message and holds the emotion while a %s hovers', (pointerType) => {
+    const { container, pet } = showEmotion();
+
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType });
+    act(() => {
+      vi.advanceTimersByTime(20000);
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling happy!');
+    expect(pet).toHaveClass('pixel-pet-state-happy');
+  });
+
+  it('ignores touch, which has no hover', () => {
+    const { container, pet } = showEmotion();
+
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'touch' });
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(pet).not.toHaveClass('pixel-pet-state-happy');
+  });
+});
+
 describe('PixelPet click bubble', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -913,8 +1015,8 @@ describe('PixelPet click bubble', () => {
     expect(pet.className).toMatch(/pixel-pet-state-(happy|angry|curious)/);
     expect(getDialog(container)).not.toBeInTheDocument();
 
-    fireEvent.mouseLeave(pet.parentElement!);
-    fireEvent.mouseEnter(pet.parentElement!);
+    fireEvent.pointerLeave(pet.parentElement!, { pointerType: 'mouse' });
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'mouse' });
 
     expect(getDialog(container)).toBeInTheDocument();
   });
@@ -1028,7 +1130,7 @@ describe('PixelPet showcase mode', () => {
     const pet = screen.getByRole('button', { name: 'Danko' });
 
     advance(30000);
-    fireEvent.mouseEnter(pet.parentElement!);
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'mouse' });
 
     expect(pet).toHaveClass('pixel-pet-state-idle');
     expect(getDialog(container)).not.toBeInTheDocument();
@@ -1095,5 +1197,839 @@ describe('PixelPet showcase mode', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
 
     expect(getDialog(container)).not.toBeInTheDocument();
+  });
+});
+
+describe('PixelPet actions menu', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const makeActions = () => [
+    { id: 'chat', label: 'Chat', onSelect: vi.fn() },
+    { id: 'rest', label: 'Rest', onSelect: vi.fn() },
+  ];
+
+  const getDialog = (container: HTMLElement) => container.querySelector('.pixel-pet-dialog');
+
+  it('keeps the 0.4.0 click reaction without actions or with an empty list', () => {
+    const { container, rerender } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).not.toHaveAttribute('aria-haspopup');
+    fireEvent.click(pet);
+    expect(getDialog(container)).toHaveTextContent('Danko is feeling happy!');
+
+    rerender(<PixelPet petName="Danko" actions={[]} />);
+
+    expect(pet).not.toHaveAttribute('aria-haspopup');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('ignores actions in showcase mode and keeps the greeting', () => {
+    const { container } = render(<PixelPet petName="Danko" mode="showcase" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+
+    expect(pet).not.toHaveAttribute('aria-haspopup');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(getDialog(container)).toHaveTextContent("Hi, I'm Danko!");
+  });
+
+  it('opens a menu with one item per action on click, without an emotion', () => {
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    expect(pet).toHaveAttribute('aria-haspopup', 'menu');
+    expect(pet).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(pet);
+
+    const menu = screen.getByRole('menu', { name: 'Danko actions' });
+    expect(pet).toHaveAttribute('aria-expanded', 'true');
+    expect(pet).toHaveAttribute('aria-controls', menu.id);
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Chat', 'Rest']);
+    expect(pet).not.toHaveClass('pixel-pet-state-happy');
+    expect(getDialog(container)).not.toBeInTheDocument();
+  });
+
+  it('calls onSelect, closes the menu, and gives the focus back to the pet', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    actions[1].onSelect.mockImplementation(() => {
+      expect(screen.getByRole('button', { name: 'Danko' })).toHaveFocus();
+    });
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.click(pet);
+    await user.click(screen.getByRole('menuitem', { name: 'Rest' }));
+
+    expect(actions[1].onSelect).toHaveBeenCalledTimes(1);
+    expect(actions[0].onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveAttribute('aria-expanded', 'false');
+    expect(pet).toHaveFocus();
+  });
+
+  it.each(['{Enter}', ' '])('opens with %s and moves the focus to the first item', async (key) => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    await user.tab();
+    await user.keyboard(key);
+
+    expect(screen.getByRole('menuitem', { name: 'Chat' })).toHaveFocus();
+  });
+
+  it('closes when the pet is clicked again', () => {
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    fireEvent.click(pet);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('does not reopen by itself when the actions go away and come back', () => {
+    const actions = makeActions();
+    const { rerender } = render(<PixelPet petName="Danko" actions={actions} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    rerender(<PixelPet petName="Danko" actions={[]} />);
+    rerender(<PixelPet petName="Danko" actions={actions} />);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('closes with Escape and gives the focus back to the pet', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveFocus();
+  });
+
+  it('closes with the close button, which is not one of the items', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.click(pet);
+    const closeButton = screen.getByRole('button', { name: 'Close menu' });
+
+    expect(screen.getByRole('menu')).not.toContainElement(closeButton);
+
+    await user.click(closeButton);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(actions.every((action) => action.onSelect.mock.calls.length === 0)).toBe(true);
+    expect(pet).toHaveFocus();
+  });
+
+  it('closes on a click outside without selecting anything', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(
+      <>
+        <PixelPet petName="Danko" actions={actions} />
+        <p>Outside</p>
+      </>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Danko' }));
+    await user.click(screen.getByText('Outside'));
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(actions.every((action) => action.onSelect.mock.calls.length === 0)).toBe(true);
+  });
+
+  it('gives the focus back to the pet when the pet is clicked to close the menu', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    fireEvent.click(pet);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveFocus();
+  });
+
+  it('gives the focus back to the pet when the actions go away while it is in the menu', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    rerender(<PixelPet petName="Danko" actions={[]} />);
+
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveFocus();
+  });
+
+  it('keeps Escape from reaching a dialog or page around the pet', async () => {
+    const user = userEvent.setup();
+    const onKeyDown = vi.fn();
+    render(
+      <div onKeyDown={(event) => onKeyDown(event.key)}>
+        <PixelPet petName="Danko" actions={makeActions()} />
+      </div>,
+    );
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    await user.keyboard('{Escape}');
+
+    expect(onKeyDown).not.toHaveBeenCalledWith('Escape');
+  });
+
+  it('stops listening for outside clicks once closed', () => {
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    fireEvent.click(pet);
+
+    expect(removeListener).toHaveBeenCalledWith('pointerdown', expect.any(Function), true);
+  });
+
+  it('translates the close button with menuLabels', () => {
+    render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ close: 'Cerrar el menú de {name}' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(screen.getByRole('button', { name: 'Cerrar el menú de Bit' })).toBeInTheDocument();
+  });
+
+  it('moves through the items with the arrow keys, Home, and End', async () => {
+    const user = userEvent.setup();
+    const actions = [...makeActions(), { id: 'theme', label: 'Theme', onSelect: vi.fn() }];
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const item = (name: string) => screen.getByRole('menuitem', { name });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(item('Chat')).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}');
+    expect(item('Rest')).toHaveFocus();
+
+    await user.keyboard('{End}');
+    expect(item('Theme')).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}');
+    expect(item('Chat')).toHaveFocus();
+
+    await user.keyboard('{ArrowUp}');
+    expect(item('Theme')).toHaveFocus();
+
+    await user.keyboard('{Home}');
+    expect(item('Chat')).toHaveFocus();
+
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(actions[1].onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the items out of the tab order and closes on Tab', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+
+    screen.getAllByRole('menuitem').forEach((item) => expect(item).toHaveAttribute('tabindex', '-1'));
+
+    await user.tab();
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveFocus();
+  });
+
+  it('opens from the pet with ArrowDown on the first item and ArrowUp on the last', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    await user.tab();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'Rest' })).toHaveFocus();
+
+    await user.keyboard('{Escape}{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Chat' })).toHaveFocus();
+  });
+
+  it('leaves the arrow keys alone without actions', async () => {
+    const user = userEvent.setup();
+    const onKeyDown = vi.fn();
+    render(
+      <div onKeyDown={(event) => onKeyDown(event.defaultPrevented)}>
+        <PixelPet petName="Danko" />
+      </div>,
+    );
+
+    await user.tab();
+    await user.keyboard('{ArrowDown}');
+
+    expect(onKeyDown).toHaveBeenCalledWith(false);
+  });
+
+  it('names the menu with menuLabels and replaces {name}', () => {
+    render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ menu: 'Acciones de {name}' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(screen.getByRole('menu', { name: 'Acciones de Bit' })).toBeInTheDocument();
+  });
+
+  it('stays closed when onClick prevents the default', () => {
+    render(
+      <PixelPet petName="Danko" actions={makeActions()} onClick={(event) => event.preventDefault()} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('uses the dialog style for the menu', () => {
+    const { container } = render(
+      <PixelPet petName="Danko" actions={makeActions()} dialogStyle={{ backgroundColor: '#123456' }} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+
+    expect(container.querySelector<HTMLElement>('.pixel-pet-menu')?.style.backgroundColor).toBe(
+      'rgb(18, 52, 86)',
+    );
+  });
+
+  it('keeps the menu inside the container like the dialog bubble', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('pixel-pet-menu') ? 180 : 60;
+    });
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(100 + parseFloat(menu?.style.left ?? '') + 180).toBe(196);
+    expect(menu?.style.maxWidth).toBe('192px');
+  });
+});
+
+describe('PixelPet while the actions menu is open', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const actions = [{ id: 'chat', label: 'Chat', onSelect: () => {} }];
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  it('stays idle in place, then walks again once the menu closes', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    advance(500);
+    expect(pet).toHaveClass('pixel-pet-state-walk');
+
+    fireEvent.click(pet);
+    const openedAt = getPositionX(container);
+    advance(2000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(getPositionX(container)).toBe(openedAt);
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    advance(500);
+
+    expect(pet).toHaveClass('pixel-pet-state-walk');
+    expect(getPositionX(container)).not.toBe(openedAt);
+  });
+
+  it('skips automatic emotions while the menu is open', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    advance(30000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+  });
+
+  it('hides the speech bubble while the menu is open and shows it again after', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" actions={actions} ref={handle} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    act(() => {
+      handle.current?.say('Hello', { duration: Infinity });
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Hello');
+  });
+});
+
+describe('PixelPet rest', () => {
+  let notifyResize: ((width: number) => void) | undefined;
+
+  class MockResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      notifyResize = (width) => {
+        callback([{ contentRect: { width } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      };
+    }
+
+    observe() {}
+
+    unobserve() {}
+
+    disconnect() {}
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const advance = (ms: number) => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 100) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+  };
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const renderPet = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    const handle = createRef<PixelPetHandle>();
+    const onRestingChange = vi.fn();
+    const view = render(
+      <PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} {...props} />,
+    );
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    const rest = (at: 'left' | 'center' | 'right') => {
+      act(() => {
+        handle.current?.rest(at);
+      });
+    };
+    return { ...view, handle, pet, rest, onRestingChange };
+  };
+
+  it('walks to the spot, falls asleep, and only then reports it', () => {
+    const { container, pet, rest, onRestingChange } = renderPet();
+
+    rest('right');
+
+    expect(pet).toHaveClass('pixel-pet-state-walk');
+    expect(pet).not.toHaveClass('pixel-pet-flip-x');
+
+    advance(1000);
+
+    expect(onRestingChange).not.toHaveBeenCalled();
+    expect(getPositionX(container)).toBeGreaterThan(100);
+
+    advance(3000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(235);
+    expect(onRestingChange).toHaveBeenCalledTimes(1);
+    expect(onRestingChange).toHaveBeenCalledWith('right');
+  });
+
+  it.each([
+    ['left', 0],
+    ['center', 117.5],
+  ] as const)('rests at the %s of its parent', (at, x) => {
+    const { container, pet, rest } = renderPet();
+
+    rest(at);
+    advance(4000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(x);
+  });
+
+  it('only wakes up with a direct click, not with other activity on the page', () => {
+    const { pet, rest, onRestingChange } = renderPet();
+
+    rest('left');
+    advance(4000);
+    onRestingChange.mockClear();
+
+    fireEvent.pointerMove(window);
+    fireEvent.wheel(window);
+    fireEvent.keyDown(window, { key: 'Tab' });
+    advance(200000);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+    fireEvent.click(pet);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    expect(onRestingChange).toHaveBeenCalledTimes(1);
+    expect(onRestingChange).toHaveBeenCalledWith(null);
+  });
+
+  it('cancels the trip without reporting anything when clicked on the way', () => {
+    const { container, pet, rest, onRestingChange } = renderPet();
+
+    rest('right');
+    advance(1000);
+    fireEvent.click(pet);
+    const stoppedAt = getPositionX(container);
+    advance(4000);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(stoppedAt);
+    expect(onRestingChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores rest() while resting or on the way', () => {
+    const { container, rest, onRestingChange } = renderPet();
+
+    rest('right');
+    rest('left');
+    advance(4000);
+
+    expect(getPositionX(container)).toBe(235);
+    expect(onRestingChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores say() while resting', () => {
+    const { container, handle, rest } = renderPet();
+
+    rest('right');
+    act(() => {
+      handle.current?.say('Hello');
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+  });
+
+  it('appears asleep at the spot right away when it cannot walk', () => {
+    const { container, pet, rest, onRestingChange } = renderPet({ walk: false });
+
+    rest('right');
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(235);
+    expect(onRestingChange).toHaveBeenCalledWith('right');
+  });
+
+  it('stays at its edge when the parent changes width', () => {
+    const { container, rest } = renderPet();
+
+    rest('right');
+    advance(4000);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500);
+    act(() => {
+      notifyResize?.(500);
+    });
+
+    expect(getPositionX(container)).toBe(435);
+  });
+
+  it('keeps the menu closed for the arrow keys while resting or on the way', () => {
+    const actions = [{ id: 'chat', label: 'Chat', onSelect: () => {} }];
+    const { pet, rest } = renderPet({ actions });
+
+    rest('right');
+    fireEvent.keyDown(pet, { key: 'ArrowDown' });
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    advance(4000);
+    fireEvent.keyDown(pet, { key: 'ArrowUp' });
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+  });
+
+  it('finishes the trip at once when walking is turned off on the way', () => {
+    const { container, pet, rest, rerender, handle, onRestingChange } = renderPet();
+
+    rest('right');
+    advance(500);
+    rerender(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} walk={false} />);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expect(getPositionX(container)).toBe(235);
+  });
+
+  it('ignores rest() and resting in showcase mode', () => {
+    const { pet, rest, onRestingChange } = renderPet({ mode: 'showcase', resting: 'right' });
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+    rest('left');
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(onRestingChange).not.toHaveBeenCalled();
+  });
+
+  describe('when controlled with resting', () => {
+    it('appears already asleep at the spot on the first render, without walking', () => {
+      const { container, pet, onRestingChange } = renderPet({ resting: 'right' });
+
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+      expect(getPositionX(container)).toBe(235);
+      expect(onRestingChange).not.toHaveBeenCalled();
+    });
+
+    it('asks to wake up on click but keeps sleeping until the prop changes', () => {
+      const { pet, rerender, onRestingChange } = renderPet({ resting: 'right' });
+
+      fireEvent.click(pet);
+
+      expect(onRestingChange).toHaveBeenCalledWith(null);
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+      rerender(<PixelPet petName="Danko" resting={null} onRestingChange={onRestingChange} />);
+
+      expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    });
+
+    it('reports the spot after rest() and sleeps once the prop follows, without walking again', () => {
+      const { container, pet, rest, rerender, onRestingChange } = renderPet({ resting: null });
+
+      rest('right');
+      advance(4000);
+
+      expect(onRestingChange).toHaveBeenCalledWith('right');
+      expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+      rerender(<PixelPet petName="Danko" resting="right" onRestingChange={onRestingChange} />);
+
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+      expect(getPositionX(container)).toBe(235);
+    });
+
+    it('walks to the spot again after a canceled trip instead of jumping there', () => {
+      const { container, pet, rest, rerender, handle, onRestingChange } = renderPet({ resting: null });
+      const renderWith = (resting: 'left' | 'right' | null) =>
+        rerender(<PixelPet petName="Danko" ref={handle} resting={resting} onRestingChange={onRestingChange} />);
+
+      rest('right');
+      advance(4000);
+      renderWith('right');
+      fireEvent.click(pet);
+      renderWith(null);
+
+      rest('left');
+      advance(1000);
+      fireEvent.click(pet);
+      const stoppedAt = getPositionX(container);
+      renderWith('right');
+
+      expect(pet).toHaveClass('pixel-pet-state-walk');
+      expect(getPositionX(container)).toBe(stoppedAt);
+    });
+
+    it('walks to a spot set later through the prop, without reporting it back', () => {
+      const { container, pet, rerender, onRestingChange } = renderPet({ resting: null });
+
+      rerender(<PixelPet petName="Danko" resting="left" onRestingChange={onRestingChange} />);
+
+      expect(pet).toHaveClass('pixel-pet-state-walk');
+
+      advance(4000);
+
+      expect(pet).toHaveClass('pixel-pet-state-sleep');
+      expect(getPositionX(container)).toBe(0);
+      expect(onRestingChange).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('PixelPet emote()', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const renderPet = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    const handle = createRef<PixelPetHandle>();
+    const view = render(<PixelPet petName="Danko" ref={handle} {...props} />);
+    const emote = (emotion: 'happy' | 'angry' | 'curious') => {
+      act(() => {
+        handle.current?.emote(emotion);
+      });
+    };
+    return { ...view, handle, emote, pet: screen.getByRole('button', { name: 'Danko' }) };
+  };
+
+  it('plays the emotion for five seconds and keeps its message for hover or focus', () => {
+    const { container, emote, pet } = renderPet();
+
+    emote('curious');
+
+    expect(pet).toHaveClass('pixel-pet-state-curious');
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+
+    focusWithKeyboard(pet);
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is very curious');
+
+    act(() => {
+      pet.blur();
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(pet).not.toHaveClass('pixel-pet-state-curious');
+  });
+
+  it('is ignored in showcase mode', () => {
+    const { emote, pet } = renderPet({ mode: 'showcase' });
+
+    emote('angry');
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+  });
+
+  it('is ignored while resting', () => {
+    const { emote, handle, pet } = renderPet({ walk: false });
+
+    act(() => {
+      handle.current?.rest('left');
+    });
+    emote('happy');
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+  });
+});
+
+describe('PixelPet insistence anger', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+
+  const actions = [{ id: 'chat', label: 'Chat', onSelect: () => {} }];
+
+  it('still gets angry after many clicks without actions, as in 0.4.0', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let click = 0; click < 6; click += 1) {
+      fireEvent.click(pet);
+      advance(500);
+    }
+
+    expect(pet).toHaveClass('pixel-pet-state-angry');
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling overwhelmed!');
+  });
+
+  it('refuses the fourth opening in five seconds with the menu closed and an angry message', () => {
+    const { container } = render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let opening = 0; opening < 3; opening += 1) {
+      fireEvent.click(pet);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      fireEvent.click(pet);
+      advance(500);
+    }
+
+    fireEvent.click(pet);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveClass('pixel-pet-state-angry');
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling overwhelmed!');
+  });
+
+  it('ignores clicks for two seconds after refusing, then opens again', () => {
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let opening = 0; opening < 4; opening += 1) {
+      fireEvent.click(pet);
+      if (opening < 3) fireEvent.click(pet);
+    }
+
+    advance(1900);
+    fireEvent.click(pet);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    advance(100);
+    fireEvent.click(pet);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('does not get angry when the openings are spread out', () => {
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let opening = 0; opening < 6; opening += 1) {
+      fireEvent.click(pet);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      fireEvent.click(pet);
+      advance(2000);
+    }
+
+    expect(pet).not.toHaveClass('pixel-pet-state-angry');
   });
 });
