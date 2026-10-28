@@ -50,9 +50,27 @@
   width: max-content;
   min-width: 120px;
   max-width: 240px;
-  padding: 4px;
+  padding: 4px 26px 4px 4px;
   font-size: 12px;
   animation: pixel-pet-pop-in 0.2s ease-out;
+}
+
+.pixel-pet-menu-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .pixel-pet-menu-list {

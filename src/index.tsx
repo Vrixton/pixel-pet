@@ -60,6 +60,7 @@ const DEFAULT_MESSAGES: Record<PetEmotion, string> = {
 };
 const DEFAULT_GREETING = "Hi, I'm {name}!";
 const DEFAULT_MENU_LABEL = '{name} actions';
+const DEFAULT_CLOSE_LABEL = 'Close menu';
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
@@ -464,10 +465,22 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  const selectMenuAction = (menuAction: PetMenuAction) => {
+  const closeMenu = () => {
     setIsMenuOpen(false);
     petRef.current?.focus();
+  };
+
+  const selectMenuAction = (menuAction: PetMenuAction) => {
+    closeMenu();
     menuAction.onSelect();
+  };
+
+  const handlePetKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Escape' && isMenuVisible) {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsMenuOpen(false);
+    }
   };
 
   const handleMouseEnter = () => {
@@ -510,6 +523,19 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     setDialogPlacement({ left: left - posXRef.current, maxWidth });
   }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
+
+  useEffect(() => {
+    if (!isMenuVisible) return;
+
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target) || petRef.current?.contains(target)) return;
+      setIsMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointer, true);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointer, true);
+  }, [isMenuVisible]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -590,12 +616,15 @@ export const PixelPet: React.FC<PixelPetProps> = ({
             ref={menuRef}
             id={menuId}
             label={fillName(menuLabels?.menu ?? DEFAULT_MENU_LABEL)}
+            closeLabel={fillName(menuLabels?.close ?? DEFAULT_CLOSE_LABEL)}
             actions={actions}
             style={{
               ...getDialogStyle(null),
               ...(menuPlacement && { left: menuPlacement.left, maxWidth: menuPlacement.maxWidth }),
             }}
             onSelect={selectMenuAction}
+            onClose={closeMenu}
+            restoreFocus={() => petRef.current?.focus()}
           />
         )}
 
@@ -611,6 +640,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           }`}
           style={spriteSrc ? { backgroundImage: `url("${spriteSrc}")` } : undefined}
           onClick={handleClick}
+          onKeyDown={handlePetKeyDown}
           onFocus={(event) => setIsFocused(event.currentTarget.matches(':focus-visible'))}
           onBlur={() => setIsFocused(false)}
         />

@@ -1202,6 +1202,113 @@ describe('PixelPet actions menu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
+  it('closes with Escape and gives the focus back to the pet', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveFocus();
+  });
+
+  it('closes with the close button, which is not one of the items', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(<PixelPet petName="Danko" actions={actions} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.click(pet);
+    const closeButton = screen.getByRole('button', { name: 'Close menu' });
+
+    expect(screen.getByRole('menu')).not.toContainElement(closeButton);
+
+    await user.click(closeButton);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(actions.every((action) => action.onSelect.mock.calls.length === 0)).toBe(true);
+    expect(pet).toHaveFocus();
+  });
+
+  it('closes on a click outside without selecting anything', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(
+      <>
+        <PixelPet petName="Danko" actions={actions} />
+        <p>Outside</p>
+      </>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Danko' }));
+    await user.click(screen.getByText('Outside'));
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(actions.every((action) => action.onSelect.mock.calls.length === 0)).toBe(true);
+  });
+
+  it('gives the focus back to the pet when the pet is clicked to close the menu', async () => {
+    const user = userEvent.setup();
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    fireEvent.click(pet);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(pet).toHaveFocus();
+  });
+
+  it('gives the focus back to the pet when the actions go away while it is in the menu', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    rerender(<PixelPet petName="Danko" actions={[]} />);
+
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveFocus();
+  });
+
+  it('keeps Escape from reaching a dialog or page around the pet', async () => {
+    const user = userEvent.setup();
+    const onKeyDown = vi.fn();
+    render(
+      <div onKeyDown={(event) => onKeyDown(event.key)}>
+        <PixelPet petName="Danko" actions={makeActions()} />
+      </div>,
+    );
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    await user.keyboard('{Escape}');
+
+    expect(onKeyDown).not.toHaveBeenCalledWith('Escape');
+  });
+
+  it('stops listening for outside clicks once closed', () => {
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    fireEvent.click(pet);
+
+    expect(removeListener).toHaveBeenCalledWith('pointerdown', expect.any(Function), true);
+  });
+
+  it('translates the close button with menuLabels', () => {
+    render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ close: 'Cerrar el menú de {name}' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(screen.getByRole('button', { name: 'Cerrar el menú de Bit' })).toBeInTheDocument();
+  });
+
   it('names the menu with menuLabels and replaces {name}', () => {
     render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ menu: 'Acciones de {name}' }} />);
 
