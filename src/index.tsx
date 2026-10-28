@@ -68,6 +68,16 @@ const getPrefersReducedMotion = () =>
 const usePrefersReducedMotion = () =>
   useSyncExternalStore(subscribeToReducedMotion, getPrefersReducedMotion, () => false);
 
+const getContainedPlacement = (stageWidth: number, anchorCenter: number, boxWidth: number) => {
+  const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
+  const width = Math.min(boxWidth, maxWidth);
+  const minLeft = DIALOG_EDGE_GAP;
+  const maxLeft = stageWidth - DIALOG_EDGE_GAP - width;
+  const left = Math.max(Math.min(anchorCenter - width / 2, maxLeft), minLeft);
+
+  return { left, maxWidth };
+};
+
 export interface PixelPetProps {
   petName?: string;
   variant?: PetVariant;
@@ -460,14 +470,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const dialog = dialogRef.current;
     if (!isDialogVisible || !stage || !walker || !dialog) return;
 
-    const stageWidth = stage.clientWidth;
-    const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
-    const dialogWidth = Math.min(dialog.offsetWidth, maxWidth);
     const petCenter = posXRef.current + walker.offsetWidth / 2;
-    const minLeft = DIALOG_EDGE_GAP;
-    const maxLeft = stageWidth - DIALOG_EDGE_GAP - dialogWidth;
-    const centeredLeft = petCenter - dialogWidth / 2;
-    const left = Math.max(Math.min(centeredLeft, maxLeft), minLeft);
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, dialog.offsetWidth);
 
     setDialogPlacement({ left: left - posXRef.current, maxWidth });
   }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
