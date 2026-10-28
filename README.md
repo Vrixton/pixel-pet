@@ -141,7 +141,7 @@ When `resting` already holds a spot on the first render, the pet appears asleep 
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
-| `petName` | `string` | `'Static'` | The name shown in the mood messages. |
+| `petName` | `string` | `'Minerva'` | The name shown in the mood messages. |
 | `variant` | `'cat' \| 'dog' \| 'axolotl' \| 'parakeet' \| 'hamster'` | `'cat'` | Which of the bundled sprites to use. |
 | `spriteSrc` | `string` | none | A URL for your own sprite sheet. It takes priority over `variant`. |
 | `color` | `string` | `'#FDDBA0'` | The pet's main color, used for its name and for the border of neutral speech bubbles. |

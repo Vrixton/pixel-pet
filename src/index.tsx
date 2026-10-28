@@ -151,7 +151,7 @@ const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
 };
 
 export const PixelPet: React.FC<PixelPetProps> = ({
-  petName = 'Static',
+  petName = 'Minerva',
   variant = 'cat',
   spriteSrc,
   color,

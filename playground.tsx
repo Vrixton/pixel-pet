@@ -22,7 +22,7 @@ interface GardenPet {
 }
 
 const PETS: GardenPet[] = [
-  { variant: 'cat', species: 'Cat', name: 'Static', color: '#F8C38E', mode: 'live', hasActions: true },
+  { variant: 'cat', species: 'Cat', name: 'Minerva', color: '#da4cab', mode: 'live', hasActions: true },
   { variant: 'dog', species: 'Dog', name: 'Danko', color: '#D9925A', mode: 'showcase' },
   { variant: 'axolotl', species: 'Axolotl', name: 'Momo', color: '#F07A9C', mode: 'showcase' },
   { variant: 'parakeet', species: 'Parakeet', name: 'Kiwi', color: '#B8A6F5', mode: 'showcase' },
