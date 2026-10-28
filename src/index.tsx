@@ -68,6 +68,9 @@ const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
 const MAX_FRAME_GAP = 100;
+const INACTIVITY_DELAY = 120000;
+const NAP_DURATION = 2500;
+const STARTLE_DURATION = 300;
 
 const subscribeToReducedMotion = (onChange: () => void) => {
   if (typeof window.matchMedia !== 'function') return () => {};
@@ -196,6 +199,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const [isFocused, setIsFocused] = useState<boolean>(false);
   const [isUserTriggered, setIsUserTriggered] = useState<boolean>(false);
   const [isHoverMuted, setIsHoverMuted] = useState<boolean>(false);
+  const [isStartled, setIsStartled] = useState<boolean>(false);
   const [speech, setSpeech] = useState<{ message: React.ReactNode; emotion: PetEmotion | null } | null>(
     null,
   );
@@ -375,20 +379,36 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   useEffect(() => {
     let inactivityTimer: ReturnType<typeof setTimeout>;
+    let napTimer: ReturnType<typeof setTimeout>;
+    let startleTimer: ReturnType<typeof setTimeout>;
+
+    const fallAsleep = () => {
+      setActiveEmotion(null);
+      updateSpeech(null);
+      setAction('sleep');
+    };
+
+    const nap = () => {
+      inactivityTimer = setTimeout(nap, INACTIVITY_DELAY);
+      if (restStateRef.current || isMenuVisibleRef.current || isSpeakingRef.current) return;
+
+      setActiveEmotion(null);
+      setAction('sleep');
+      napTimer = setTimeout(() => {
+        if (actionRef.current !== 'sleep') return;
+        setAction('idle');
+        setIsStartled(true);
+        startleTimer = setTimeout(() => setIsStartled(false), STARTLE_DURATION);
+      }, NAP_DURATION);
+    };
 
     const resetInactivity = () => {
-      setAction((prevAction) => {
-        if (prevAction === 'sleep') return 'idle';
-        return prevAction;
-      });
+      if (isShowcase) {
+        setAction((prevAction) => (prevAction === 'sleep' ? 'idle' : prevAction));
+      }
 
       clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        if (restStateRef.current) return;
-        setActiveEmotion(null);
-        updateSpeech(null);
-        setAction('sleep');
-      }, 120000);
+      inactivityTimer = setTimeout(isShowcase ? fallAsleep : nap, INACTIVITY_DELAY);
     };
 
     ACTIVITY_EVENTS.forEach((event) => {
@@ -398,11 +418,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     return () => {
       clearTimeout(inactivityTimer);
+      clearTimeout(napTimer);
+      clearTimeout(startleTimer);
       ACTIVITY_EVENTS.forEach((event) => {
         window.removeEventListener(event, resetInactivity);
       });
     };
-  }, []);
+  }, [isShowcase]);
 
   useEffect(() => {
     actionRef.current = action;
@@ -785,7 +807,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     >
       <div
         ref={walkerRef}
-        className="pixel-pet-container"
+        className={`pixel-pet-container${isStartled ? ' pixel-pet-startle' : ''}`}
         style={{ transform: `translateX(${INITIAL_POSITION}px)` }}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}>

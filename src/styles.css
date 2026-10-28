@@ -16,6 +16,10 @@
   pointer-events: auto;
 }
 
+.pixel-pet-startle {
+  animation: pixel-pet-startle 0.3s ease-out;
+}
+
 .pixel-pet-status {
   position: absolute;
   top: 0;
@@ -225,6 +229,11 @@
   100% { background-position: -610px -315px; }
 }
 
+@keyframes pixel-pet-startle {
+  0%, 100% { translate: 0 0; }
+  35% { translate: 0 -3px; }
+}
+
 @keyframes pixel-pet-pop-in {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -240,6 +249,10 @@
   }
 
   .pixel-pet-menu {
+    animation: none;
+  }
+
+  .pixel-pet-startle {
     animation: none;
   }
 }

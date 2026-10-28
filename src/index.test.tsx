@@ -141,7 +141,7 @@ describe('PixelPet dialog bubble', () => {
   });
 });
 
-describe('PixelPet sleep', () => {
+describe('PixelPet nap', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -158,23 +158,39 @@ describe('PixelPet sleep', () => {
     });
   };
 
-  const renderAndSleep = () => {
-    render(<PixelPet petName="Danko" />);
-    advance(1000);
-    fireEvent.pointerMove(window);
-    advance(120000);
-    const pet = screen.getByRole('button', { name: 'Danko' });
-    expect(pet).toHaveClass('pixel-pet-state-sleep');
-    return pet;
+  const renderPet = () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    return {
+      pet: screen.getByRole('button', { name: 'Danko' }),
+      walker: container.querySelector<HTMLElement>('.pixel-pet-container')!,
+    };
   };
 
-  it('falls asleep two minutes after the last activity', () => {
-    renderAndSleep();
+  it('naps for a moment two minutes after the last activity and wakes up with a startle', () => {
+    const { pet, walker } = renderPet();
+
+    advance(1000);
+    fireEvent.pointerMove(window);
+    advance(119900);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+    advance(100);
+
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+
+    advance(2500);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(walker).toHaveClass('pixel-pet-startle');
+
+    advance(300);
+
+    expect(walker).not.toHaveClass('pixel-pet-startle');
   });
 
   it('counts keyboard activity and stays awake', () => {
-    render(<PixelPet petName="Danko" />);
-    const pet = screen.getByRole('button', { name: 'Danko' });
+    const { pet } = renderPet();
 
     advance(1000);
     fireEvent.keyDown(window, { key: 'Tab' });
@@ -185,18 +201,57 @@ describe('PixelPet sleep', () => {
     expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 
-  it('wakes up with a key press', () => {
-    const pet = renderAndSleep();
+  it('no longer stays asleep after two minutes without activity', () => {
+    const { pet } = renderPet();
 
-    fireEvent.keyDown(window, { key: 'Tab' });
+    advance(120000);
+    advance(5000);
 
     expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
 
-  it('wakes up with a touch anywhere on the page', () => {
-    const pet = renderAndSleep();
+  it('naps again every two minutes while there is no activity', () => {
+    const { pet } = renderPet();
 
-    fireEvent.pointerDown(window, { pointerType: 'touch' });
+    advance(120000);
+    advance(2500);
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+
+    advance(120000 - 2500);
+    expect(pet).toHaveClass('pixel-pet-state-sleep');
+  });
+
+  it('wakes up early without a startle when tapped', () => {
+    const { pet, walker } = renderPet();
+
+    advance(120000);
+    fireEvent.click(pet);
+    advance(2500);
+
+    expect(pet).not.toHaveClass('pixel-pet-state-sleep');
+    expect(walker).not.toHaveClass('pixel-pet-startle');
+  });
+
+  it('skips the nap while the actions menu is open', () => {
+    render(<PixelPet petName="Danko" actions={[{ id: 'chat', label: 'Chat', onSelect: () => {} }]} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    advance(120000);
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('skips the nap while speaking', () => {
+    const handle = createRef<PixelPetHandle>();
+    render(<PixelPet petName="Danko" ref={handle} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    act(() => {
+      handle.current?.say('Still here', { duration: Infinity });
+    });
+    advance(120000);
 
     expect(pet).not.toHaveClass('pixel-pet-state-sleep');
   });
@@ -332,7 +387,7 @@ describe('PixelPet emotions', () => {
     expect(pet).toHaveClass('pixel-pet-state-idle');
   });
 
-  it('stays asleep when falling asleep and an automatic emotion happen at the same time', () => {
+  it('keeps napping when the nap and an automatic emotion happen at the same time', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
@@ -340,7 +395,7 @@ describe('PixelPet emotions', () => {
     advance(120000);
     expect(pet).toHaveClass('pixel-pet-state-sleep');
 
-    advance(10000);
+    advance(2000);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
   });
