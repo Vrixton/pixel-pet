@@ -671,7 +671,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  const handleMouseEnter = () => {
+  const handlePointerEnter = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     setIsHovered(true);
     if (isSpeakingRef.current) clearSpeechTimer();
     if (activeEmotion) {
@@ -680,7 +681,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     setIsHovered(false);
     setIsHoverMuted(false);
     if (isSpeakingRef.current) scheduleSpeechEnd(speechDurationRef.current);
@@ -785,8 +787,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         ref={walkerRef}
         className="pixel-pet-container"
         style={{ transform: `translateX(${INITIAL_POSITION}px)` }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}>
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}>
 
         <div className="pixel-pet-status" role="status">
           {isDialogVisible && (

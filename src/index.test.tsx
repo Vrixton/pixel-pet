@@ -16,7 +16,7 @@ const focusWithKeyboard = (element: HTMLElement) => {
 };
 
 const clickWithMouse = (element: HTMLElement) => {
-  fireEvent.mouseEnter(element.parentElement!);
+  fireEvent.pointerEnter(element.parentElement!, { pointerType: 'mouse' });
   fireEvent.pointerDown(element);
   fireEvent.mouseDown(element);
   act(() => {
@@ -701,8 +701,8 @@ describe('PixelPet say()', () => {
 
     say('Ask me anything.', { duration: Infinity });
     advance(50000);
-    fireEvent.mouseEnter(pet.parentElement!);
-    fireEvent.mouseLeave(pet.parentElement!);
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'mouse' });
+    fireEvent.pointerLeave(pet.parentElement!, { pointerType: 'mouse' });
     advance(50000);
 
     expect(getDialog(container)).toHaveTextContent('Ask me anything.');
@@ -865,6 +865,53 @@ describe('PixelPet onClick', () => {
   });
 });
 
+describe('PixelPet hover', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const showEmotion = () => {
+    const handle = createRef<PixelPetHandle>();
+    const view = render(<PixelPet petName="Danko" ref={handle} />);
+    act(() => {
+      handle.current?.emote('happy');
+    });
+    return { ...view, pet: screen.getByRole('button', { name: 'Danko' }) };
+  };
+
+  it.each(['mouse', 'pen'])('shows the message and holds the emotion while a %s hovers', (pointerType) => {
+    const { container, pet } = showEmotion();
+
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType });
+    act(() => {
+      vi.advanceTimersByTime(20000);
+    });
+
+    expect(container.querySelector('.pixel-pet-dialog')).toHaveTextContent('Danko is feeling happy!');
+    expect(pet).toHaveClass('pixel-pet-state-happy');
+  });
+
+  it('ignores touch, which has no hover', () => {
+    const { container, pet } = showEmotion();
+
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'touch' });
+
+    expect(container.querySelector('.pixel-pet-dialog')).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(pet).not.toHaveClass('pixel-pet-state-happy');
+  });
+});
+
 describe('PixelPet click bubble', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -913,8 +960,8 @@ describe('PixelPet click bubble', () => {
     expect(pet.className).toMatch(/pixel-pet-state-(happy|angry|curious)/);
     expect(getDialog(container)).not.toBeInTheDocument();
 
-    fireEvent.mouseLeave(pet.parentElement!);
-    fireEvent.mouseEnter(pet.parentElement!);
+    fireEvent.pointerLeave(pet.parentElement!, { pointerType: 'mouse' });
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'mouse' });
 
     expect(getDialog(container)).toBeInTheDocument();
   });
@@ -1028,7 +1075,7 @@ describe('PixelPet showcase mode', () => {
     const pet = screen.getByRole('button', { name: 'Danko' });
 
     advance(30000);
-    fireEvent.mouseEnter(pet.parentElement!);
+    fireEvent.pointerEnter(pet.parentElement!, { pointerType: 'mouse' });
 
     expect(pet).toHaveClass('pixel-pet-state-idle');
     expect(getDialog(container)).not.toBeInTheDocument();
