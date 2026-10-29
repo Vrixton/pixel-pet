@@ -192,7 +192,7 @@ Messages can be plain strings with two markers, so they fit in translation files
 />
 ```
 
-`{name}` becomes the pet's name in its color, `__word__` shows any word in the pet's color, and `**word**` shows that word in the color of the emotion. If your translation system already fills in `{name}` itself, wrap it as `__{name}__`, so the pet receives `__Bit__` and still paints the name. The markers also work in `say()`: there, `**word**` takes the color of the requested emotion, or the pet's color when there is none. In `label`, which screen readers read aloud, only `{name}` is replaced. Any emotion you leave out keeps its English message.
+`{name}` becomes the pet's name in its color, `__word__` shows any word in the pet's color, and `**word**` shows that word in the color of the emotion. If your translation system already fills in `{name}` itself, wrap it as `__{name}__`, so the pet receives `__Bit__` and still paints the name. The markers also work in `say()`: there, `**word**` takes the color of the requested emotion, or the pet's color when there is none. Action labels in `actions` accept the same markers, with `**word**` in the pet's color, and screen readers read them without the markers. In `label`, which screen readers read aloud, only `{name}` is replaced. Any emotion you leave out keeps its English message.
 
 Messages can also be any React node when you need more control. The highlight classes are `pixel-pet-highlight-pet`, `pixel-pet-highlight-happy`, `pixel-pet-highlight-angry`, and `pixel-pet-highlight-curious`.
 
