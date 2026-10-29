@@ -267,6 +267,20 @@ With `mode="showcase"`, the pet stays in place playing its idle animation, with 
 
 The pet is a real button, so it can be reached with the keyboard, has a visible focus outline, and is announced with its name. With actions, it is announced as a menu button and its menu can be used entirely from the keyboard. When the user prefers reduced motion, it stays still, its animation pauses, and the bubble, the menu, and the start after a doze appear without motion.
 
+## Browser support
+
+Version 0.6.2 was checked in these engines:
+
+| Engine | Tested in | Device pixel ratios |
+| --- | --- | --- |
+| Blink | Chromium 141 | 1, 1.25, 1.5, and 2 |
+| Gecko | Firefox 159 | 1, 1.25, 1.5, and 2 |
+| WebKit | WebKitGTK 2.52 | 1 and 2 |
+
+In all three, the checks covered the walk and its speed, positions landing on whole physical pixels, how `spriteSrc` is escaped and measured, trips and `rest('nearest')`, and the menu from the keyboard. Reduced motion was checked in Chromium and Firefox, and accessibility with axe in Chromium.
+
+Safari hasn't been tested yet. It shares WebKit with WebKitGTK but composites differently on macOS and iOS. Mobile browsers haven't been tested either. If you find a problem in a browser, please [open an issue](https://github.com/Vrixton/pixel-pet/issues).
+
 ## Development
 
 You need Node.js 24 or later and pnpm.
