@@ -2,7 +2,7 @@
 
 All notable changes to `@vrixton/pixel-pet` are listed here, newest first. Dates are the day each version was published to npm.
 
-## Unreleased
+## 0.6.2 (2026-10-29)
 
 This is the first version on npm since 0.5.2, so it also ships everything listed under 0.6.1 and 0.6.0, which were prepared but never published.
 
