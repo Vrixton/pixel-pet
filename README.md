@@ -115,6 +115,10 @@ Without `actions`, with an empty list, or in showcase mode, a click behaves as i
 pet.current?.rest('right');
 ```
 
+It also accepts `'nearest'`, which sends the pet to whichever edge is closer at that moment, left or right but never the center, since resting is how the user moves it out of the way. When the two edges are almost as close, with less than 10% of the container's width between the two distances, it keeps going the way it is facing instead of turning around for a few pixels. `'nearest'` is only a command: `onRestingChange` receives the side it picked, `'left'` or `'right'`, so you can store that. The method takes a `RestCommand`, while the `resting` prop and `onRestingChange` stay `RestAt | null`.
+
+Short trips happen at walking speed. Trips longer than 120px speed up so they last about three seconds, up to three times the walking speed for trips longer than 360px, so even crossing a wide screen takes only a few seconds.
+
 While resting, only a direct click on the pet wakes it up. Scrolling, moving the mouse, typing, `say()`, and `emote()` leave it alone. A click while it is still on its way cancels the trip. Calling `rest()` again while it is resting or on its way does nothing, and it is ignored in showcase mode.
 
 `onRestingChange` tells you when the state changes: it receives the spot once the pet is really asleep there, and `null` when the user wakes it up. A trip that was canceled reports nothing.
@@ -253,7 +257,7 @@ A sheet passed through `spriteSrc` has to follow the same layout as the bundled 
 
 ## How it behaves
 
-The pet wanders on its own, sometimes walking and sometimes standing, and turns around at the edges of the container. Every 30 seconds it may switch to a random mood for 5 seconds. Focusing it with the keyboard shows what it's feeling, and so does hovering over it with a mouse or a pen, which also holds the mood and keeps the pet in place until the pointer leaves, so the message can be read. Touch screens have no hover, so there the message only shows on a click. Without `actions`, clicking it shows its last mood for three seconds, and clicking it more than five times in ten seconds makes it angry. After a click, the bubble stays hidden while the pointer rests on the pet; moving the pointer away and back shows it again.
+The pet wanders on its own, sometimes walking and sometimes standing. It eases into each walk and slows down before stopping, over about 200ms. At an edge, or when it has to turn around to reach a resting spot, it slows to a stop, turns, and pauses for a moment before setting off again. Its feet follow the distance it covers rather than a clock, with one full stride every 52/60 of the rendered frame width, so they keep up at any speed. Its position snaps to the pixel grid of the sprite so the art doesn't shimmer while it moves. Every 30 seconds it may switch to a random mood for 5 seconds. Focusing it with the keyboard shows what it's feeling, and so does hovering over it with a mouse or a pen, which also holds the mood and keeps the pet in place until the pointer leaves, so the message can be read. Touch screens have no hover, so there the message only shows on a click. Without `actions`, clicking it shows its last mood for three seconds, and clicking it more than five times in ten seconds makes it angry. After a click, the bubble stays hidden while the pointer rests on the pet; moving the pointer away and back shows it again.
 
 After two minutes without mouse, touch, keyboard, or scroll wheel activity on the page, it dozes off for a couple of seconds and wakes up by itself with a little start. It does it again every two minutes while the page stays quiet. It only stays asleep when you ask it to [rest](#resting), so a sleeping pet always means the same thing.
 
