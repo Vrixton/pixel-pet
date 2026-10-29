@@ -2826,6 +2826,17 @@ describe('PixelPet pixel snapping', () => {
     expect(positions.every(Number.isInteger)).toBe(true);
   });
 
+  it.each([1.25, 1.5, 1.75])('draws on whole physical pixels at a device pixel ratio of %s', (dpr) => {
+    vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(dpr);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(20);
+    positions.forEach((x) => {
+      expect(Math.abs(x * dpr - Math.round(x * dpr))).toBeLessThan(1e-6);
+    });
+  });
+
   it('snaps to one source pixel of a sheet the page has scaled up', () => {
     vi.stubGlobal('Image', LoadedImage);
     const style = document.createElement('style');

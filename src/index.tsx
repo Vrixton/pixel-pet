@@ -610,7 +610,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const getDrawnX = () => {
     const unit = pixelUnitRef.current;
-    return Math.round(posXRef.current / unit) * unit;
+    const dpr = window.devicePixelRatio || 1;
+    return Math.round(Math.round(posXRef.current / unit) * unit * dpr) / dpr;
   };
 
   const getSheetWidth = (sprite: HTMLElement) =>
