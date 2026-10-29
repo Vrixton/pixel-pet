@@ -1,4 +1,6 @@
 import { Profiler, createRef } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1648,6 +1650,12 @@ describe('PixelPet rest', () => {
     return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
   };
 
+  const expectRestingAt = (container: HTMLElement, at: 'left' | 'center' | 'right') => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    expect(walker).toHaveClass(`pixel-pet-rest-${at}`);
+    expect(walker?.style.transform).toBe('');
+  };
+
   const renderPet = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
     const handle = createRef<PixelPetHandle>();
     const onRestingChange = vi.fn();
@@ -1679,7 +1687,7 @@ describe('PixelPet rest', () => {
     advance(3000);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
     expect(onRestingChange).toHaveBeenCalledTimes(1);
     expect(onRestingChange).toHaveBeenCalledWith('right');
   });
@@ -1687,13 +1695,18 @@ describe('PixelPet rest', () => {
   it.each([
     ['left', 0],
     ['center', 117.5],
-  ] as const)('rests at the %s of its parent', (at, x) => {
+  ] as const)('rests at the %s of its parent and wakes up right there', (at, x) => {
     const { container, pet, rest } = renderPet();
 
     rest(at);
     advance(4000);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expectRestingAt(container, at);
+
+    fireEvent.click(pet);
+
+    expect(container.querySelector('.pixel-pet-container')).not.toHaveClass(`pixel-pet-rest-${at}`);
     expect(getPositionX(container)).toBe(x);
   });
 
@@ -1739,7 +1752,7 @@ describe('PixelPet rest', () => {
     rest('left');
     advance(4000);
 
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
     expect(onRestingChange).toHaveBeenCalledTimes(1);
   });
 
@@ -1760,12 +1773,12 @@ describe('PixelPet rest', () => {
     rest('right');
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
     expect(onRestingChange).toHaveBeenCalledWith('right');
   });
 
-  it('stays at its edge when the parent changes width', () => {
-    const { container, rest } = renderPet();
+  it('stays at its edge when the parent changes width and wakes up there', () => {
+    const { container, pet, rest } = renderPet();
 
     rest('right');
     advance(4000);
@@ -1773,6 +1786,10 @@ describe('PixelPet rest', () => {
     act(() => {
       notifyResize?.(500);
     });
+
+    expectRestingAt(container, 'right');
+
+    fireEvent.click(pet);
 
     expect(getPositionX(container)).toBe(435);
   });
@@ -1801,7 +1818,7 @@ describe('PixelPet rest', () => {
     rerender(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} walk={false} />);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
   });
 
   it('ignores rest() and resting in showcase mode', () => {
@@ -1815,12 +1832,43 @@ describe('PixelPet rest', () => {
     expect(onRestingChange).not.toHaveBeenCalled();
   });
 
+  it('renders the resting spot in the server HTML, before any script runs', () => {
+    const html = renderToString(<PixelPet petName="Danko" resting="right" />);
+    const walker = new DOMParser().parseFromString(html, 'text/html').querySelector('.pixel-pet-container');
+
+    expect(walker?.getAttribute('class')?.split(' ')).toContain('pixel-pet-rest-right');
+    expect(walker?.getAttribute('style')).toBeNull();
+  });
+
+  it.each([
+    ['awake on the server and resting on the client', null, 'right'],
+    ['resting on the server and awake on the client', 'right', null],
+  ] as const)('corrects itself after hydrating when it was %s', (_, serverResting, clientResting) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<PixelPet petName="Danko" resting={serverResting} />);
+    document.body.appendChild(container);
+
+    act(() => {
+      hydrateRoot(container, <PixelPet petName="Danko" resting={clientResting} />);
+    });
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+
+    if (clientResting) {
+      expectRestingAt(container, 'right');
+    } else {
+      expect(walker).not.toHaveClass('pixel-pet-rest-right');
+      expect(walker.style.transform).toBe('translateX(100px)');
+    }
+    container.remove();
+  });
+
   describe('when controlled with resting', () => {
     it('appears already asleep at the spot on the first render, without walking', () => {
       const { container, pet, onRestingChange } = renderPet({ resting: 'right' });
 
       expect(pet).toHaveClass('pixel-pet-state-sleep');
-      expect(getPositionX(container)).toBe(235);
+      expectRestingAt(container, 'right');
       expect(onRestingChange).not.toHaveBeenCalled();
     });
 
@@ -1849,7 +1897,7 @@ describe('PixelPet rest', () => {
       rerender(<PixelPet petName="Danko" resting="right" onRestingChange={onRestingChange} />);
 
       expect(pet).toHaveClass('pixel-pet-state-sleep');
-      expect(getPositionX(container)).toBe(235);
+      expectRestingAt(container, 'right');
     });
 
     it('walks to the spot again after a canceled trip instead of jumping there', () => {
@@ -1883,7 +1931,7 @@ describe('PixelPet rest', () => {
       advance(4000);
 
       expect(pet).toHaveClass('pixel-pet-state-sleep');
-      expect(getPositionX(container)).toBe(0);
+      expectRestingAt(container, 'left');
       expect(onRestingChange).not.toHaveBeenCalled();
     });
   });

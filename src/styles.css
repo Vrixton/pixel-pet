@@ -16,6 +16,21 @@
   pointer-events: auto;
 }
 
+.pixel-pet-rest-left {
+  left: 0;
+}
+
+.pixel-pet-rest-right {
+  left: auto;
+  right: 0;
+}
+
+/* Centering relies on the translate property, so the walk must keep positioning this element with transform. */
+.pixel-pet-rest-center {
+  left: 50%;
+  translate: -50% 0;
+}
+
 .pixel-pet-startle {
   animation: pixel-pet-startle 0.3s ease-out;
 }

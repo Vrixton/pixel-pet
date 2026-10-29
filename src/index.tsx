@@ -29,6 +29,8 @@ export type PetMode = 'live' | 'showcase';
 export type PetMessages = Partial<Record<PetEmotion | 'greeting', React.ReactNode>>;
 export type RestAt = 'left' | 'center' | 'right';
 
+const REST_SPOTS: RestAt[] = ['left', 'center', 'right'];
+
 export interface PetMenuLabels {
   menu?: string;
   close?: string;
@@ -194,6 +196,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   );
   const restStateRef = useRef<RestState | null>(restState);
   const isResting = restState !== null;
+  const asleepAt = restState?.phase === 'asleep' ? restState.at : null;
   const standingAtRef = useRef<RestAt | null>(null);
   const previousRestingRef = useRef<RestAt | null | undefined>(resting);
   const onRestingChangeRef = useRef(onRestingChange);
@@ -506,6 +509,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const applyPosition = (x: number) => {
     posXRef.current = x;
+    if (restStateRef.current?.phase === 'asleep') return;
     if (walkerRef.current) walkerRef.current.style.transform = `translateX(${x}px)`;
   };
 
@@ -600,6 +604,18 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     applyPosition(getRestX(restState.at, stage.clientWidth));
   }, [restState, stageWidth]);
+
+  useLayoutEffect(() => {
+    const walker = walkerRef.current;
+    if (!walker) return;
+
+    REST_SPOTS.forEach((at) => walker.classList.toggle(`pixel-pet-rest-${at}`, at === asleepAt));
+    if (asleepAt) {
+      walker.style.removeProperty('transform');
+    } else {
+      applyPosition(posXRef.current);
+    }
+  }, [asleepAt]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -837,8 +853,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     >
       <div
         ref={walkerRef}
-        className={`pixel-pet-container${isStartled ? ' pixel-pet-startle' : ''}`}
-        style={{ transform: `translateX(${INITIAL_POSITION}px)` }}
+        className={`pixel-pet-container${isStartled && !asleepAt ? ' pixel-pet-startle' : ''}${
+          asleepAt ? ` pixel-pet-rest-${asleepAt}` : ''
+        }`}
+        style={asleepAt ? undefined : { transform: `translateX(${INITIAL_POSITION}px)` }}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}>
 
