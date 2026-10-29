@@ -74,6 +74,8 @@ const WALK_FRAME_WIDTH = 60;
 const WALK_ROW_Y = 73;
 const WALK_ROW_END = 600;
 const WALK_STRIDE_IN_FRAME_WIDTHS = 52 / 60;
+const WALK_RAMP = 200;
+const WALK_TURN_PAUSE = (2 * WALK_STRIDE_IN_FRAME_WIDTHS * WALK_FRAME_WIDTH) / WALK_FRAMES / WALK_SPEED;
 const MAX_FRAME_GAP = 100;
 const INACTIVITY_DELAY = 120000;
 const NAP_DURATION = 2500;
@@ -106,6 +108,21 @@ interface RestState {
   at: RestAt;
   phase: 'walking' | 'asleep';
   origin: 'method' | 'prop';
+}
+
+type Facing = 'left' | 'right';
+
+type WalkIntent =
+  | { kind: 'wander' }
+  | { kind: 'trip'; rest: RestState; targetX: number; speed: number };
+
+interface WalkMotion {
+  frameId: number;
+  lastTime: number | null;
+  speed: number;
+  cruise: number;
+  pausedUntil: number;
+  pauseIntent: WalkIntent | null;
 }
 
 const getContainedPlacement = (
@@ -234,7 +251,20 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const walkFrameRef = useRef<number>(-1);
   const strideRef = useRef<number>(0);
   const [stageWidth, setStageWidth] = useState<number>(0);
-  const [direction, setDirection] = useState<'left' | 'right'>('right');
+  const stageWidthRef = useRef<number>(0);
+  const [direction, setDirection] = useState<Facing>('right');
+  const facingRef = useRef<Facing>('right');
+  const [isStepping, setIsStepping] = useState<boolean>(false);
+  const intentRef = useRef<WalkIntent | null>(null);
+  const motionRef = useRef<WalkMotion>({
+    frameId: 0,
+    lastTime: null,
+    speed: 0,
+    cruise: WALK_SPEED,
+    pausedUntil: 0,
+    pauseIntent: null,
+  });
+  const motionStepRef = useRef<(time: number) => void>(() => {});
 
   const fillName = (text: string) => text.split('{name}').join(petName);
 
@@ -557,93 +587,183 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     if (walkerRef.current) walkerRef.current.style.transform = `translateX(${x}px)`;
   };
 
-  useEffect(() => {
-    if (
-      action !== 'walk' ||
-      activeEmotion !== null ||
-      speech !== null ||
-      !canWalk ||
-      isMenuVisible ||
-      isResting
-    ) {
+  const face = (facing: Facing) => {
+    facingRef.current = facing;
+    setDirection(facing);
+  };
+
+  const stopMotion = () => {
+    const motion = motionRef.current;
+    cancelAnimationFrame(motion.frameId);
+    motion.frameId = 0;
+    motion.speed = 0;
+    setIsStepping(false);
+  };
+
+  const startMotion = () => {
+    const motion = motionRef.current;
+    if (motion.frameId) return;
+    motion.lastTime = null;
+    setIsStepping(true);
+    motion.frameId = requestAnimationFrame((time) => motionStepRef.current(time));
+  };
+
+  const finishWander = () => {
+    intentRef.current = null;
+    stopMotion();
+    setAction('idle');
+    idleCooldownRef.current = true;
+    setTimeout(() => {
+      idleCooldownRef.current = false;
+    }, 30000);
+  };
+
+  const stepMotion = (time: number) => {
+    const motion = motionRef.current;
+    const elapsed = motion.lastTime === null ? 0 : Math.min(time - motion.lastTime, MAX_FRAME_GAP);
+    motion.lastTime = time;
+    const scheduleNext = () => {
+      motion.frameId = requestAnimationFrame((next) => motionStepRef.current(next));
+    };
+    const pauseToTurn = (facing: Facing, intent: WalkIntent) => {
+      motion.speed = 0;
+      face(facing);
+      motion.pausedUntil = time + WALK_TURN_PAUSE;
+      motion.pauseIntent = intent;
+      scheduleNext();
+    };
+
+    const intent = intentRef.current;
+    if (time < motion.pausedUntil && intent === motion.pauseIntent) {
+      scheduleNext();
+      return;
+    }
+    motion.pausedUntil = 0;
+
+    const x = posXRef.current;
+    const maxX = Math.max(stageWidthRef.current - SPRITE_MAX_WIDTH, 0);
+    const sign = facingRef.current === 'right' ? 1 : -1;
+    const toEdge = Math.max(sign > 0 ? maxX - x : x, 0);
+    let wanted = facingRef.current;
+    let remaining = toEdge;
+
+    if (intent?.kind === 'wander') {
+      motion.cruise = WALK_SPEED;
+    } else if (intent?.kind === 'trip') {
+      motion.cruise = intent.speed;
+      const offset = intent.targetX - x;
+      if (Math.abs(offset) > 0.01) wanted = offset > 0 ? 'right' : 'left';
+      if (wanted === facingRef.current) remaining = Math.abs(offset);
+    }
+
+    const turning = intent !== null && wanted !== facingRef.current;
+    const accel = motion.cruise / WALK_RAMP;
+    if (intent && !turning) {
+      motion.speed = Math.min(motion.speed + accel * elapsed, motion.cruise, Math.sqrt(2 * accel * remaining));
+    } else {
+      motion.speed = Math.max(motion.speed - accel * elapsed, 0);
+    }
+
+    const stride = Math.min(motion.speed * elapsed, remaining);
+    if (stride > 0) {
+      applyPosition(x + sign * stride);
+      stepWalkFrames(stride);
+    }
+    const arrived = remaining - stride <= 0.01;
+
+    if (!intent) {
+      if (motion.speed === 0 || arrived) {
+        stopMotion();
+        return;
+      }
+      scheduleNext();
       return;
     }
 
-    const minBoundary = 0;
-    const maxBoundary = stageWidth - SPRITE_MAX_WIDTH;
-    if (maxBoundary <= minBoundary) return;
-
-    let frameId = 0;
-    let lastTime: number | null = null;
-
-    const step = (time: number) => {
-      const elapsed = lastTime === null ? 0 : Math.min(time - lastTime, MAX_FRAME_GAP);
-      lastTime = time;
-      const nextX = posXRef.current + (direction === 'right' ? 1 : -1) * WALK_SPEED * elapsed;
-
-      if (nextX <= minBoundary || nextX >= maxBoundary) {
-        if (Math.random() > 0.5) {
-          setAction('idle');
-          idleCooldownRef.current = true;
-          setTimeout(() => {
-            idleCooldownRef.current = false;
-          }, 30000);
-          return;
-        }
-
-        applyPosition(nextX <= minBoundary ? minBoundary + 2 : maxBoundary - 2);
-        setDirection((prevDir) => (prevDir === 'right' ? 'left' : 'right'));
+    if (turning) {
+      if (motion.speed > 0 && !arrived) {
+        scheduleNext();
         return;
       }
+      pauseToTurn(wanted, intent);
+      return;
+    }
 
-      applyPosition(nextX);
-      stepWalkFrames(WALK_SPEED * elapsed);
-      frameId = requestAnimationFrame(step);
-    };
+    if (!arrived) {
+      scheduleNext();
+      return;
+    }
 
-    frameId = requestAnimationFrame(step);
+    if (intent.kind === 'trip') {
+      intentRef.current = null;
+      stopMotion();
+      if (intent.rest === restStateRef.current) arriveAt(intent.rest);
+      return;
+    }
 
-    return () => cancelAnimationFrame(frameId);
-  }, [action, activeEmotion, speech, direction, canWalk, stageWidth, isMenuVisible, isResting]);
+    if (Math.random() > 0.5) {
+      finishWander();
+      return;
+    }
+
+    pauseToTurn(facingRef.current === 'right' ? 'left' : 'right', intent);
+  };
+
+  useLayoutEffect(() => {
+    motionStepRef.current = stepMotion;
+  });
+
+  const canWander =
+    action === 'walk' &&
+    activeEmotion === null &&
+    speech === null &&
+    canWalk &&
+    !isMenuVisible &&
+    !isResting &&
+    stageWidth - SPRITE_MAX_WIDTH > 0;
+
+  useEffect(() => {
+    if (canWander) {
+      if (intentRef.current?.kind === 'trip') return;
+      intentRef.current = { kind: 'wander' };
+      startMotion();
+    } else {
+      if (intentRef.current?.kind === 'wander') intentRef.current = null;
+      if (!canWalk && intentRef.current === null) stopMotion();
+    }
+  }, [canWander]);
 
   useEffect(() => {
     const stage = stageRef.current;
-    if (restState?.phase !== 'walking' || !stage) return;
+    if (restState?.phase !== 'walking' || !stage) {
+      if (intentRef.current?.kind === 'trip') intentRef.current = null;
+      return;
+    }
 
     const targetX = getRestX(restState.at, stage.clientWidth);
     if (!canWalk) {
+      intentRef.current = null;
+      stopMotion();
       applyPosition(targetX);
       arriveAt(restState);
       return;
     }
 
-    setDirection(targetX >= posXRef.current ? 'right' : 'left');
-
-    let frameId = 0;
-    let lastTime: number | null = null;
-
-    const step = (time: number) => {
-      const elapsed = lastTime === null ? 0 : Math.min(time - lastTime, MAX_FRAME_GAP);
-      lastTime = time;
-      const distance = targetX - posXRef.current;
-      const stride = WALK_SPEED * elapsed;
-
-      if (Math.abs(distance) <= stride) {
-        applyPosition(targetX);
-        stepWalkFrames(distance);
-        arriveAt(restState);
-        return;
-      }
-
-      applyPosition(posXRef.current + Math.sign(distance) * stride);
-      stepWalkFrames(stride);
-      frameId = requestAnimationFrame(step);
-    };
-
-    frameId = requestAnimationFrame(step);
-
-    return () => cancelAnimationFrame(frameId);
+    intentRef.current = { kind: 'trip', rest: restState, targetX, speed: WALK_SPEED };
+    startMotion();
   }, [restState, stageWidth, canWalk]);
+
+  useEffect(() => {
+    if (!motionRef.current.frameId) setIsStepping(false);
+
+    return () => {
+      const motion = motionRef.current;
+      cancelAnimationFrame(motion.frameId);
+      motion.frameId = 0;
+      motion.speed = 0;
+      motion.lastTime = null;
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -670,6 +790,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     const updateStageWidth = (width: number) => {
       standingAtRef.current = null;
+      stageWidthRef.current = width;
       setStageWidth(width);
       applyPosition(Math.max(Math.min(posXRef.current, width - SPRITE_MAX_WIDTH), 0));
     };
@@ -834,7 +955,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, dialog.offsetWidth);
 
     setDialogPlacement({ left: left - posXRef.current, maxWidth });
-  }, [isDialogVisible, visibleEmotion, speech, stageWidth]);
+  }, [isDialogVisible, visibleEmotion, speech, stageWidth, isStepping]);
 
   useEffect(() => {
     if (!isMenuVisible) return;
@@ -863,13 +984,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth, Infinity);
 
     setMenuPlacement({ left: left - posXRef.current, maxWidth });
-  }, [isMenuVisible, actions, stageWidth]);
+  }, [isMenuVisible, actions, stageWidth, isStepping]);
 
   const getCurrentStateClass = () => {
+    if (isStepping) return 'pixel-pet-state-walk';
     if (restState) return restState.phase === 'walking' ? 'pixel-pet-state-walk' : 'pixel-pet-state-sleep';
     if (isMenuVisible) return 'pixel-pet-state-idle';
     if (visibleEmotion) return `pixel-pet-state-${visibleEmotion}`;
-    if ((!canWalk || isSpeaking) && action === 'walk') return 'pixel-pet-state-idle';
+    if (action === 'walk') return 'pixel-pet-state-idle';
     return `pixel-pet-state-${action}`;
   };
 
