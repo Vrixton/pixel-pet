@@ -135,7 +135,7 @@ const [resting, setResting] = useState<RestAt | null>(() => readRestingFromStora
 />
 ```
 
-When `resting` already holds a spot on the first render, the pet appears asleep there without walking. Changing it later sends the pet there. With `resting`, the prop is the source of truth: a click reports `null` through `onRestingChange`, but the pet keeps sleeping until the prop changes. If you pass `resting` and ignore `onRestingChange`, the pet never wakes up.
+When `resting` already holds a spot on the first render, the pet appears asleep there without walking. While it rests, the pet is anchored to its spot with CSS instead of a measured offset, so server-rendered HTML already shows it in place before any script runs. For that, the server has to render the same `resting` as the client: with server rendering, keep the value somewhere the server can read too, such as a cookie, rather than in `localStorage`. If the two differ, React reports a hydration mismatch, and the pet moves to the client's spot once the page hydrates. Changing it later sends the pet there. With `resting`, the prop is the source of truth: a click reports `null` through `onRestingChange`, but the pet keeps sleeping until the prop changes. If you pass `resting` and ignore `onRestingChange`, the pet never wakes up.
 
 ## Props
 
@@ -212,6 +212,40 @@ Messages can also be any React node when you need more control. The highlight cl
 A field set in `emotionDialogStyles` wins over the same field in `dialogStyle`, which wins over the default. Messages from `say()` without an emotion use `dialogStyle`.
 
 The `color` prop sets the `--pixel-pet-color` CSS variable on the pet. You can also set that variable from your own stylesheet on any element that contains the pet.
+
+## Styling the menu
+
+The actions menu reads these CSS variables. Define them on any element that contains the pet, for example to plug the menu into your design tokens:
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `--pixel-pet-menu-bg` | `#05080ceb` | Background of the menu |
+| `--pixel-pet-menu-fg` | `#ffffff` | Text color of the items and the close button |
+| `--pixel-pet-menu-border` | `var(--pixel-pet-color, #FDDBA0)` | Border color |
+| `--pixel-pet-menu-border-width` | `1px` | Border width. Use `0` to remove the border. |
+| `--pixel-pet-menu-radius` | `0` | Corner radius |
+| `--pixel-pet-menu-font` | `monospace` | Font family |
+| `--pixel-pet-menu-font-size` | `12px` | Font size |
+| `--pixel-pet-menu-item-hover-bg` | `rgba(255, 255, 255, 0.12)` | Background of an item on hover and keyboard focus |
+| `--pixel-pet-menu-focus` | `var(--pixel-pet-color, #FDDBA0)` | Color of the keyboard focus ring around an item |
+| `--pixel-pet-menu-max-width` | `240px` | Maximum width, as a length such as `280px` or `20rem`. Keywords like `none` and percentages aren't supported. The menu also stays 4px inside each side of its container, without getting narrower than 120px, and longer labels wrap onto more lines, even a single long word. |
+
+```css
+.screen {
+  --pixel-pet-menu-bg: var(--window-bg);
+  --pixel-pet-menu-border: var(--window-border);
+  --pixel-pet-menu-font: var(--font-pixel);
+  --pixel-pet-menu-max-width: 280px;
+}
+```
+
+For backward compatibility with 0.5.0, the menu still follows `dialogStyle`, but with a lower priority than the variables. For each of these properties, the menu uses the first one that is set:
+
+1. The `--pixel-pet-menu-*` variable, even when it is defined on a distant ancestor.
+2. The matching `dialogStyle` field passed to the pet.
+3. The default above.
+
+This is the opposite of the usual CSS intuition, where the closest setting wins: a variable defined high up the page beats a `dialogStyle` passed straight to the component. The variables are the recommended way to style the menu, and `dialogStyle` is only a fallback for it. The speech bubble doesn't read these variables and keeps using `dialogStyle` exactly as before.
 
 ## Custom sprites
 

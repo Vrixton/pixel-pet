@@ -1,9 +1,11 @@
 import { Profiler, createRef } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PixelPet, type PixelPetHandle } from './index';
+import { PixelPet, type DialogStyleProps, type PixelPetHandle } from './index';
 
 const getSprite = (container: HTMLElement) =>
   container.querySelector<HTMLElement>('.pixel-pet-sprite');
@@ -1501,16 +1503,57 @@ describe('PixelPet actions menu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('uses the dialog style for the menu', () => {
+  it('passes dialogStyle to the menu as a fallback that the CSS variables can override', () => {
     const { container } = render(
-      <PixelPet petName="Danko" actions={makeActions()} dialogStyle={{ backgroundColor: '#123456' }} />,
+      <PixelPet
+        petName="Danko"
+        actions={makeActions()}
+        dialogStyle={{ backgroundColor: '#123456', borderWidth: '2px', fontFamily: 'serif' }}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu')!;
 
-    expect(container.querySelector<HTMLElement>('.pixel-pet-menu')?.style.backgroundColor).toBe(
-      'rgb(18, 52, 86)',
+    expect(menu.style.getPropertyValue('--_pixel-pet-dialog-bg')).toBe('#123456');
+    expect(menu.style.getPropertyValue('--_pixel-pet-dialog-border-width')).toBe('2px');
+    expect(menu.style.getPropertyValue('--_pixel-pet-dialog-font')).toBe('serif');
+    expect(menu.style.backgroundColor).toBe('');
+    expect(menu.style.border).toBe('');
+  });
+
+  it('ignores dialogStyle keys it does not know', () => {
+    const dialogStyle = { backgroundColor: '#123456', boxShadow: 'none' } as DialogStyleProps;
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} dialogStyle={dialogStyle} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu')!;
+
+    expect([...menu.style].filter((property) => property.startsWith('--'))).toEqual(['--_pixel-pet-dialog-bg']);
+    expect(menu.getAttribute('style')).not.toContain('undefined');
+  });
+
+  it('leaves the menu to its stylesheet without dialogStyle', () => {
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu')!;
+
+    expect([...menu.style].filter((property) => property.startsWith('--'))).toEqual([]);
+    expect(menu.style.backgroundColor).toBe('');
+  });
+
+  it('keeps styling the speech bubble inline with dialogStyle, as in 0.5.0', () => {
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(
+      <PixelPet petName="Danko" ref={handle} actions={makeActions()} dialogStyle={{ backgroundColor: '#123456' }} />,
     );
+
+    act(() => {
+      handle.current?.say('Hello');
+    });
+
+    expect(container.querySelector<HTMLElement>('.pixel-pet-dialog')?.style.backgroundColor).toBe('rgb(18, 52, 86)');
   });
 
   it('keeps the menu inside the container like the dialog bubble', () => {
@@ -1526,7 +1569,44 @@ describe('PixelPet actions menu', () => {
     const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
 
     expect(100 + parseFloat(menu?.style.left ?? '') + 180).toBe(196);
-    expect(menu?.style.maxWidth).toBe('192px');
+    expect(menu?.style.maxWidth).toBe('min(var(--pixel-pet-menu-max-width, 240px), 192px)');
+  });
+
+  it('measures the menu again from scratch each time it opens', () => {
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (!this.classList.contains('pixel-pet-menu')) return 60;
+      return this.style.maxWidth.includes('192px') ? 192 : 300;
+    });
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    clientWidth.mockReturnValue(600);
+    fireEvent.click(pet);
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(100 + parseFloat(menu?.style.left ?? '')).toBe(4);
+    expect(menu?.style.maxWidth).toBe('min(var(--pixel-pet-menu-max-width, 240px), 592px)');
+  });
+
+  it('lets a menu wider than 240px through when the max-width variable allows it', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('pixel-pet-menu') ? 300 : 60;
+    });
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(100 + parseFloat(menu?.style.left ?? '')).toBe(4);
+    expect(menu?.style.maxWidth).toBe('min(var(--pixel-pet-menu-max-width, 240px), 492px)');
   });
 });
 
@@ -1648,6 +1728,12 @@ describe('PixelPet rest', () => {
     return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
   };
 
+  const expectRestingAt = (container: HTMLElement, at: 'left' | 'center' | 'right') => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    expect(walker).toHaveClass(`pixel-pet-rest-${at}`);
+    expect(walker?.style.transform).toBe('');
+  };
+
   const renderPet = (props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
     const handle = createRef<PixelPetHandle>();
     const onRestingChange = vi.fn();
@@ -1679,7 +1765,7 @@ describe('PixelPet rest', () => {
     advance(3000);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
     expect(onRestingChange).toHaveBeenCalledTimes(1);
     expect(onRestingChange).toHaveBeenCalledWith('right');
   });
@@ -1687,13 +1773,18 @@ describe('PixelPet rest', () => {
   it.each([
     ['left', 0],
     ['center', 117.5],
-  ] as const)('rests at the %s of its parent', (at, x) => {
+  ] as const)('rests at the %s of its parent and wakes up right there', (at, x) => {
     const { container, pet, rest } = renderPet();
 
     rest(at);
     advance(4000);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
+    expectRestingAt(container, at);
+
+    fireEvent.click(pet);
+
+    expect(container.querySelector('.pixel-pet-container')).not.toHaveClass(`pixel-pet-rest-${at}`);
     expect(getPositionX(container)).toBe(x);
   });
 
@@ -1739,7 +1830,7 @@ describe('PixelPet rest', () => {
     rest('left');
     advance(4000);
 
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
     expect(onRestingChange).toHaveBeenCalledTimes(1);
   });
 
@@ -1760,12 +1851,12 @@ describe('PixelPet rest', () => {
     rest('right');
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
     expect(onRestingChange).toHaveBeenCalledWith('right');
   });
 
-  it('stays at its edge when the parent changes width', () => {
-    const { container, rest } = renderPet();
+  it('stays at its edge when the parent changes width and wakes up there', () => {
+    const { container, pet, rest } = renderPet();
 
     rest('right');
     advance(4000);
@@ -1773,6 +1864,10 @@ describe('PixelPet rest', () => {
     act(() => {
       notifyResize?.(500);
     });
+
+    expectRestingAt(container, 'right');
+
+    fireEvent.click(pet);
 
     expect(getPositionX(container)).toBe(435);
   });
@@ -1801,7 +1896,7 @@ describe('PixelPet rest', () => {
     rerender(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} walk={false} />);
 
     expect(pet).toHaveClass('pixel-pet-state-sleep');
-    expect(getPositionX(container)).toBe(235);
+    expectRestingAt(container, 'right');
   });
 
   it('ignores rest() and resting in showcase mode', () => {
@@ -1815,12 +1910,43 @@ describe('PixelPet rest', () => {
     expect(onRestingChange).not.toHaveBeenCalled();
   });
 
+  it('renders the resting spot in the server HTML, before any script runs', () => {
+    const html = renderToString(<PixelPet petName="Danko" resting="right" />);
+    const walker = new DOMParser().parseFromString(html, 'text/html').querySelector('.pixel-pet-container');
+
+    expect(walker?.getAttribute('class')?.split(' ')).toContain('pixel-pet-rest-right');
+    expect(walker?.getAttribute('style')).toBeNull();
+  });
+
+  it.each([
+    ['awake on the server and resting on the client', null, 'right'],
+    ['resting on the server and awake on the client', 'right', null],
+  ] as const)('corrects itself after hydrating when it was %s', (_, serverResting, clientResting) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<PixelPet petName="Danko" resting={serverResting} />);
+    document.body.appendChild(container);
+
+    act(() => {
+      hydrateRoot(container, <PixelPet petName="Danko" resting={clientResting} />);
+    });
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+
+    if (clientResting) {
+      expectRestingAt(container, 'right');
+    } else {
+      expect(walker).not.toHaveClass('pixel-pet-rest-right');
+      expect(walker.style.transform).toBe('translateX(100px)');
+    }
+    container.remove();
+  });
+
   describe('when controlled with resting', () => {
     it('appears already asleep at the spot on the first render, without walking', () => {
       const { container, pet, onRestingChange } = renderPet({ resting: 'right' });
 
       expect(pet).toHaveClass('pixel-pet-state-sleep');
-      expect(getPositionX(container)).toBe(235);
+      expectRestingAt(container, 'right');
       expect(onRestingChange).not.toHaveBeenCalled();
     });
 
@@ -1849,7 +1975,7 @@ describe('PixelPet rest', () => {
       rerender(<PixelPet petName="Danko" resting="right" onRestingChange={onRestingChange} />);
 
       expect(pet).toHaveClass('pixel-pet-state-sleep');
-      expect(getPositionX(container)).toBe(235);
+      expectRestingAt(container, 'right');
     });
 
     it('walks to the spot again after a canceled trip instead of jumping there', () => {
@@ -1883,7 +2009,7 @@ describe('PixelPet rest', () => {
       advance(4000);
 
       expect(pet).toHaveClass('pixel-pet-state-sleep');
-      expect(getPositionX(container)).toBe(0);
+      expectRestingAt(container, 'left');
       expect(onRestingChange).not.toHaveBeenCalled();
     });
   });

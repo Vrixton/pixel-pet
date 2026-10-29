@@ -29,6 +29,8 @@ export type PetMode = 'live' | 'showcase';
 export type PetMessages = Partial<Record<PetEmotion | 'greeting', React.ReactNode>>;
 export type RestAt = 'left' | 'center' | 'right';
 
+const REST_SPOTS: RestAt[] = ['left', 'center', 'right'];
+
 export interface PetMenuLabels {
   menu?: string;
   close?: string;
@@ -101,8 +103,13 @@ interface RestState {
   origin: 'method' | 'prop';
 }
 
-const getContainedPlacement = (stageWidth: number, anchorCenter: number, boxWidth: number) => {
-  const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
+const getContainedPlacement = (
+  stageWidth: number,
+  anchorCenter: number,
+  boxWidth: number,
+  maxBoxWidth = DIALOG_MAX_WIDTH,
+) => {
+  const maxWidth = Math.max(Math.min(maxBoxWidth, stageWidth - DIALOG_EDGE_GAP * 2), 0);
   const width = Math.min(boxWidth, maxWidth);
   const minLeft = DIALOG_EDGE_GAP;
   const maxLeft = stageWidth - DIALOG_EDGE_GAP - width;
@@ -143,6 +150,15 @@ const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
     backgroundColor: '#1f341deb',
     borderColor: '#8BE383',
   },
+};
+
+const MENU_FALLBACK_VARIABLES: Record<keyof DialogStyleProps, string> = {
+  backgroundColor: '--_pixel-pet-dialog-bg',
+  textColor: '--_pixel-pet-dialog-fg',
+  borderColor: '--_pixel-pet-dialog-border',
+  borderWidth: '--_pixel-pet-dialog-border-width',
+  borderRadius: '--_pixel-pet-dialog-radius',
+  fontFamily: '--_pixel-pet-dialog-font',
 };
 
 const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
@@ -194,6 +210,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   );
   const restStateRef = useRef<RestState | null>(restState);
   const isResting = restState !== null;
+  const asleepAt = restState?.phase === 'asleep' ? restState.at : null;
   const standingAtRef = useRef<RestAt | null>(null);
   const previousRestingRef = useRef<RestAt | null | undefined>(resting);
   const onRestingChangeRef = useRef(onRestingChange);
@@ -506,6 +523,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const applyPosition = (x: number) => {
     posXRef.current = x;
+    if (restStateRef.current?.phase === 'asleep') return;
     if (walkerRef.current) walkerRef.current.style.transform = `translateX(${x}px)`;
   };
 
@@ -600,6 +618,18 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
     applyPosition(getRestX(restState.at, stage.clientWidth));
   }, [restState, stageWidth]);
+
+  useLayoutEffect(() => {
+    const walker = walkerRef.current;
+    if (!walker) return;
+
+    REST_SPOTS.forEach((at) => walker.classList.toggle(`pixel-pet-rest-${at}`, at === asleepAt));
+    if (asleepAt) {
+      walker.style.removeProperty('transform');
+    } else {
+      applyPosition(posXRef.current);
+    }
+  }, [asleepAt]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -790,10 +820,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const stage = stageRef.current;
     const walker = walkerRef.current;
     const menu = menuRef.current;
-    if (!isMenuVisible || !stage || !walker || !menu) return;
+    if (!isMenuVisible) {
+      setMenuPlacement(null);
+      return;
+    }
+    if (!stage || !walker || !menu) return;
 
     const petCenter = posXRef.current + walker.offsetWidth / 2;
-    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth);
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth, Infinity);
 
     setMenuPlacement({ left: left - posXRef.current, maxWidth });
   }, [isMenuVisible, actions, stageWidth]);
@@ -805,6 +839,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     if ((!canWalk || isSpeaking) && action === 'walk') return 'pixel-pet-state-idle';
     return `pixel-pet-state-${action}`;
   };
+
+  const getMenuFallbacks = () =>
+    Object.fromEntries(
+      Object.entries(dialogStyle)
+        .filter(([field, value]) => value !== undefined && field in MENU_FALLBACK_VARIABLES)
+        .map(([field, value]) => [MENU_FALLBACK_VARIABLES[field as keyof DialogStyleProps], value]),
+    ) as CSSProperties;
 
   const getDialogStyle = (emotion: PetEmotion | null): CSSProperties => {
     const defaultEmotionConfig = emotion ? DEFAULT_EMOTION_STYLES[emotion] : DEFAULT_SPEECH_STYLE;
@@ -837,8 +878,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     >
       <div
         ref={walkerRef}
-        className={`pixel-pet-container${isStartled ? ' pixel-pet-startle' : ''}`}
-        style={{ transform: `translateX(${INITIAL_POSITION}px)` }}
+        className={`pixel-pet-container${isStartled && !asleepAt ? ' pixel-pet-startle' : ''}${
+          asleepAt ? ` pixel-pet-rest-${asleepAt}` : ''
+        }`}
+        style={asleepAt ? undefined : { transform: `translateX(${INITIAL_POSITION}px)` }}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}>
 
@@ -871,8 +914,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
             closeLabel={fillName(menuLabels?.close ?? DEFAULT_CLOSE_LABEL)}
             actions={actions}
             style={{
-              ...getDialogStyle(null),
-              ...(menuPlacement && { left: menuPlacement.left, maxWidth: menuPlacement.maxWidth }),
+              ...getMenuFallbacks(),
+              ...(menuPlacement && {
+                left: menuPlacement.left,
+                maxWidth: `min(var(--pixel-pet-menu-max-width, ${DIALOG_MAX_WIDTH}px), ${menuPlacement.maxWidth}px)`,
+              }),
             }}
             onSelect={selectMenuAction}
             onClose={closeMenu}

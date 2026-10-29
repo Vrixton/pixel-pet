@@ -16,6 +16,21 @@
   pointer-events: auto;
 }
 
+.pixel-pet-rest-left {
+  left: 0;
+}
+
+.pixel-pet-rest-right {
+  left: auto;
+  right: 0;
+}
+
+/* Centering relies on the translate property, so the walk must keep positioning this element with transform. */
+.pixel-pet-rest-center {
+  left: 50%;
+  translate: -50% 0;
+}
+
 .pixel-pet-startle {
   animation: pixel-pet-startle 0.3s ease-out;
 }
@@ -53,9 +68,15 @@
   box-sizing: border-box;
   width: max-content;
   min-width: 120px;
-  max-width: 240px;
+  max-width: var(--pixel-pet-menu-max-width, 240px);
   padding: 4px 26px 4px 4px;
-  font-size: 12px;
+  border: var(--pixel-pet-menu-border-width, var(--_pixel-pet-dialog-border-width, 1px)) solid
+    var(--pixel-pet-menu-border, var(--_pixel-pet-dialog-border, var(--pixel-pet-color, #FDDBA0)));
+  border-radius: var(--pixel-pet-menu-radius, var(--_pixel-pet-dialog-radius, 0));
+  background-color: var(--pixel-pet-menu-bg, var(--_pixel-pet-dialog-bg, #05080ceb));
+  color: var(--pixel-pet-menu-fg, var(--_pixel-pet-dialog-fg, #ffffff));
+  font-family: var(--pixel-pet-menu-font, var(--_pixel-pet-dialog-font, monospace));
+  font-size: var(--pixel-pet-menu-font-size, 12px);
   animation: pixel-pet-pop-in 0.2s ease-out;
 }
 
@@ -92,16 +113,17 @@
   color: inherit;
   font: inherit;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
 .pixel-pet-menu-item:hover,
 .pixel-pet-menu-item:focus-visible {
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: var(--pixel-pet-menu-item-hover-bg, rgba(255, 255, 255, 0.12));
 }
 
 .pixel-pet-menu-item:focus-visible {
-  outline: 1px solid var(--pixel-pet-color, #FDDBA0);
+  outline: 1px solid var(--pixel-pet-menu-focus, var(--pixel-pet-color, #FDDBA0));
   outline-offset: -1px;
 }
 
