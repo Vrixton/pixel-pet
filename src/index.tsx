@@ -69,6 +69,11 @@ const DEFAULT_CLOSE_LABEL = 'Close menu';
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const WALK_SPEED = 0.04;
+const WALK_FRAMES = 9;
+const WALK_FRAME_WIDTH = 60;
+const WALK_ROW_Y = 73;
+const WALK_ROW_END = 600;
+const WALK_STRIDE_IN_FRAME_WIDTHS = 52 / 60;
 const MAX_FRAME_GAP = 100;
 const INACTIVITY_DELAY = 120000;
 const NAP_DURATION = 2500;
@@ -225,6 +230,9 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   );
 
   const posXRef = useRef<number>(INITIAL_POSITION);
+  const travelledRef = useRef<number>(0);
+  const walkFrameRef = useRef<number>(-1);
+  const strideRef = useRef<number>(0);
   const [stageWidth, setStageWidth] = useState<number>(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
 
@@ -521,6 +529,28 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, [action, canWalk, isMenuVisible, isResting]);
 
+  const stepWalkFrames = (distance: number) => {
+    const sprite = petRef.current;
+    if (!sprite) return;
+
+    if (walkFrameRef.current < 0) {
+      strideRef.current = WALK_STRIDE_IN_FRAME_WIDTHS * (sprite.offsetWidth || WALK_FRAME_WIDTH);
+    }
+    travelledRef.current += Math.abs(distance);
+    const frame = Math.floor(travelledRef.current / (strideRef.current / WALK_FRAMES)) % WALK_FRAMES;
+    if (frame === walkFrameRef.current) return;
+
+    walkFrameRef.current = frame;
+    const frameX = Math.round((frame * WALK_ROW_END) / WALK_FRAMES);
+    sprite.style.backgroundPosition = `-${frameX}px -${WALK_ROW_Y}px`;
+  };
+
+  const resetWalkFrames = () => {
+    travelledRef.current = 0;
+    walkFrameRef.current = -1;
+    petRef.current?.style.removeProperty('background-position');
+  };
+
   const applyPosition = (x: number) => {
     posXRef.current = x;
     if (restStateRef.current?.phase === 'asleep') return;
@@ -567,6 +597,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       }
 
       applyPosition(nextX);
+      stepWalkFrames(WALK_SPEED * elapsed);
       frameId = requestAnimationFrame(step);
     };
 
@@ -599,11 +630,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
       if (Math.abs(distance) <= stride) {
         applyPosition(targetX);
+        stepWalkFrames(distance);
         arriveAt(restState);
         return;
       }
 
       applyPosition(posXRef.current + Math.sign(distance) * stride);
+      stepWalkFrames(stride);
       frameId = requestAnimationFrame(step);
     };
 
@@ -840,6 +873,12 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return `pixel-pet-state-${action}`;
   };
 
+  const stateClass = getCurrentStateClass();
+
+  useLayoutEffect(() => {
+    if (stateClass !== 'pixel-pet-state-walk') resetWalkFrames();
+  }, [stateClass]);
+
   const getMenuFallbacks = () =>
     Object.fromEntries(
       Object.entries(dialogStyle)
@@ -934,7 +973,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           aria-haspopup={hasMenu ? 'menu' : undefined}
           aria-expanded={hasMenu ? isMenuVisible : undefined}
           aria-controls={isMenuVisible ? menuId : undefined}
-          className={`pixel-pet-sprite pixel-pet-${variant} ${getCurrentStateClass()} ${
+          className={`pixel-pet-sprite pixel-pet-${variant} ${stateClass} ${
             direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}
           style={spriteSrc ? { backgroundImage: `url("${spriteSrc}")` } : undefined}

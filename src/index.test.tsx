@@ -2186,3 +2186,92 @@ describe('PixelPet insistence anger', () => {
     expect(pet).not.toHaveClass('pixel-pet-state-angry');
   });
 });
+
+describe('PixelPet walk frames', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const getFrameX = (pet: HTMLElement) => Number(pet.style.backgroundPosition.match(/^-?(\d+)px/)?.[1] ?? 0);
+
+  const walkFor = (ms: number, frameWidth = 60) => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(frameWidth);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    const frames: number[] = [];
+    const distances: number[] = [];
+    for (let elapsed = 0; elapsed < ms; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      frames.push(getFrameX(pet));
+      distances.push(Math.abs(getPositionX(container) - 100));
+    }
+    return { pet, frames, distances };
+  };
+
+  const expectedFrameX = (distance: number, frameWidth: number) => {
+    const frame = Math.floor(distance / (((52 / 60) * frameWidth) / 9)) % 9;
+    return Math.round((frame * 600) / 9);
+  };
+
+  it('picks the walk frame from the distance walked, one stride every 52px at the current size', () => {
+    const { frames, distances } = walkFor(3000);
+
+    frames.forEach((frameX, index) => {
+      expect(frameX).toBe(expectedFrameX(distances[index], 60));
+    });
+    expect(new Set(frames).size).toBe(9);
+  });
+
+  it('keeps the stride proportional to the rendered frame width', () => {
+    const { frames, distances } = walkFor(3000, 120);
+
+    frames.forEach((frameX, index) => {
+      expect(frameX).toBe(expectedFrameX(distances[index], 120));
+    });
+  });
+
+  it('measures the rendered frame once per walk instead of on every step', () => {
+    let spriteReads = 0;
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('pixel-pet-sprite')) spriteReads += 1;
+      return 60;
+    });
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    render(<PixelPet petName="Danko" />);
+
+    for (let elapsed = 0; elapsed < 2000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+    }
+
+    expect(spriteReads).toBe(1);
+  });
+
+  it('goes back to the stylesheet animation once it stops walking', () => {
+    const { pet } = walkFor(1000);
+
+    expect(pet.style.backgroundPosition).not.toBe('');
+
+    act(() => {
+      vi.advanceTimersByTime(13000);
+    });
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(pet.style.backgroundPosition).toBe('');
+  });
+});

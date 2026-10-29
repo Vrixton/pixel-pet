@@ -64,6 +64,13 @@ describe('component stylesheet', () => {
     expect(componentStyles).toMatch(/outline:[^;]*var\(--pixel-pet-menu-focus,/);
   });
 
+  it('leaves the walk frames to the script, with no animation clock of its own', () => {
+    const walkRule = componentStyles.match(/\.pixel-pet-state-walk\s*\{[^}]*\}/)?.[0] ?? '';
+
+    expect(walkRule).not.toMatch(/animation/);
+    expect(componentStyles).not.toMatch(/@keyframes\s+pixel-pet-walk/);
+  });
+
   it('skips the menu animation for reduced motion', () => {
     const reducedMotionBlock = componentStyles.slice(
       componentStyles.indexOf('@media (prefers-reduced-motion: reduce)'),

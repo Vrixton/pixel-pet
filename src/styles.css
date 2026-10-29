@@ -198,7 +198,7 @@
 }
 
 .pixel-pet-state-walk {
-  animation: pixel-pet-walk 1.3s steps(9) infinite;
+  background-position: 0 -73px;
 }
 
 .pixel-pet-state-happy {
@@ -224,11 +224,6 @@
 @keyframes pixel-pet-idle {
   0% { background-position: 0 -5px; }
   100% { background-position: -605px -5px; }
-}
-
-@keyframes pixel-pet-walk {
-  0% { background-position: 0 -73px; }
-  100% { background-position: -600px -73px; }
 }
 
 @keyframes pixel-pet-happy {
