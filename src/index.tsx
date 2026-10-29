@@ -672,9 +672,17 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       measurePixelUnit();
     };
 
+    const handleError = () => {
+      console.warn(`PixelPet could not load the sprite sheet at "${url}".`);
+    };
+
     image.addEventListener('load', handleLoad);
+    image.addEventListener('error', handleError);
     image.src = url;
-    return () => image.removeEventListener('load', handleLoad);
+    return () => {
+      image.removeEventListener('load', handleLoad);
+      image.removeEventListener('error', handleError);
+    };
   }, [variant, spriteSrc]);
 
   const face = (facing: Facing) => {

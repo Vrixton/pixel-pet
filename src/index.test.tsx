@@ -2804,8 +2804,8 @@ describe('PixelPet pixel snapping', () => {
 
     private onLoad: (() => void) | undefined;
 
-    addEventListener(_type: string, listener: () => void) {
-      this.onLoad = listener;
+    addEventListener(type: string, listener: () => void) {
+      if (type === 'load') this.onLoad = listener;
     }
 
     removeEventListener() {}
@@ -2924,6 +2924,34 @@ describe('PixelPet pixel snapping', () => {
 
     expect(offsets.size).toBe(9);
     expect([...offsets].every((offset) => scaled.includes(offset))).toBe(true);
+  });
+
+  it('warns once with the path when the sheet cannot be loaded', () => {
+    class BrokenImage {
+      naturalWidth = 0;
+
+      private onError: (() => void) | undefined;
+
+      addEventListener(type: string, listener: () => void) {
+        if (type === 'error') this.onError = listener;
+      }
+
+      removeEventListener() {}
+
+      set src(_value: string) {
+        setTimeout(() => this.onError?.(), 0);
+      }
+    }
+    vi.stubGlobal('Image', BrokenImage);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<PixelPet petName="Danko" spriteSrc="/pets/missing.png" />);
+
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('/pets/missing.png');
   });
 
   it('does not move the pet again when a new measurement differs only by rounding noise', () => {
