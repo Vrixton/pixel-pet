@@ -2526,6 +2526,31 @@ describe('PixelPet walk ramps', () => {
     vi.unstubAllGlobals();
   });
 
+  it('takes the trip target and the walking edges from the same container width', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+
+        disconnect() {}
+      },
+    );
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    clientWidth.mockReturnValue(600);
+    act(() => {
+      handle.current?.rest('right');
+    });
+    const { positions } = track(container, 12000);
+    const walked = positions.filter((x) => !Number.isNaN(x));
+
+    expect(Math.max(...walked)).toBe(935);
+    vi.unstubAllGlobals();
+  });
+
   it('brakes within a few pixels when something interrupts the walk', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);

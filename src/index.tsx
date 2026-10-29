@@ -371,7 +371,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   };
 
   const resolveNearest = (): RestAt => {
-    const width = stageRef.current?.clientWidth ?? 0;
+    const width = stageWidthRef.current;
     const toLeft = posXRef.current;
     const toRight = Math.max(width - SPRITE_MAX_WIDTH, 0) - posXRef.current;
     if (Math.abs(toLeft - toRight) < width * NEAREST_TIE_BAND) return facingRef.current;
@@ -447,7 +447,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           return;
         }
 
-        applyPosition(getRestX(at, stageRef.current?.clientWidth ?? 0));
+        applyPosition(getRestX(at, stageWidthRef.current));
         arriveAt(trip);
       },
     }),
@@ -836,7 +836,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       return;
     }
 
-    const targetX = getRestX(restState.at, stage.clientWidth);
+    const targetX = getRestX(restState.at, stageWidthRef.current);
     if (!canWalk) {
       intentRef.current = null;
       stopMotion();
@@ -871,7 +871,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const stage = stageRef.current;
     if (restState?.phase !== 'asleep' || !stage) return;
 
-    applyPosition(getRestX(restState.at, stage.clientWidth));
+    applyPosition(getRestX(restState.at, stageWidthRef.current));
   }, [restState, stageWidth]);
 
   useLayoutEffect(() => {
