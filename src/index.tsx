@@ -913,6 +913,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
             label={fillName(menuLabels?.menu ?? DEFAULT_MENU_LABEL)}
             closeLabel={fillName(menuLabels?.close ?? DEFAULT_CLOSE_LABEL)}
             actions={actions}
+            renderLabel={(text) => formatMessage(text, null)}
             style={{
               ...getMenuFallbacks(),
               ...(menuPlacement && {

@@ -1485,6 +1485,33 @@ describe('PixelPet actions menu', () => {
     expect(onKeyDown).toHaveBeenCalledWith(false);
   });
 
+  it('formats the action labels like the other texts and keeps the markers out of their names', () => {
+    const actions = [
+      { id: 'chat', label: 'Chat with {name}', onSelect: vi.fn() },
+      { id: 'faq', label: 'Read the **FAQ** with __Bit__', onSelect: vi.fn() },
+    ];
+    render(<PixelPet petName="Bit" actions={actions} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+    const chat = screen.getByRole('menuitem', { name: 'Chat with Bit' });
+    const faq = screen.getByRole('menuitem', { name: 'Read the FAQ with Bit' });
+
+    expect(chat.querySelector('.pixel-pet-highlight-pet')).toHaveTextContent('Bit');
+    expect([...faq.querySelectorAll('.pixel-pet-highlight-pet')].map((span) => span.textContent)).toEqual([
+      'FAQ',
+      'Bit',
+    ]);
+    expect(faq.textContent).not.toMatch(/[*_]/);
+  });
+
+  it('leaves action labels without markers as plain text', () => {
+    render(<PixelPet petName="Bit" actions={[{ id: 'faq', label: 'snake_case 2 * 3', onSelect: () => {} }]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bit' }));
+
+    expect(screen.getByRole('menuitem', { name: 'snake_case 2 * 3' }).children).toHaveLength(0);
+  });
+
   it('names the menu with menuLabels and replaces {name}', () => {
     render(<PixelPet petName="Bit" actions={makeActions()} menuLabels={{ menu: 'Acciones de {name}' }} />);
 
