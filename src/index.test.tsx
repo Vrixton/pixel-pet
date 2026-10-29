@@ -2604,6 +2604,38 @@ describe('PixelPet walk ramps', () => {
     expect(getPositionX(container) - shown).toBeGreaterThan(10);
   });
 
+  it('stands idle after being hidden while braking and shown again', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container, rerender } = render(
+      <Activity mode="visible">
+        <PixelPet petName="Danko" ref={handle} />
+      </Activity>,
+    );
+
+    sample(container, 500);
+    act(() => {
+      handle.current?.say('Wait');
+    });
+    sample(container, 48);
+    rerender(
+      <Activity mode="hidden">
+        <PixelPet petName="Danko" ref={handle} />
+      </Activity>,
+    );
+    rerender(
+      <Activity mode="visible">
+        <PixelPet petName="Danko" ref={handle} />
+      </Activity>,
+    );
+    const shown = getPositionX(container);
+    sample(container, 300);
+
+    expect(getPositionX(container)).toBe(shown);
+    expect(container.querySelector('.pixel-pet-sprite')).not.toHaveClass('pixel-pet-state-walk');
+  });
+
   it('brakes before turning around, then faces the other way for a moment before setting off', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);

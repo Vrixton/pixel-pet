@@ -846,6 +846,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   }, [restState, stageWidth, canWalk]);
 
   useEffect(() => {
+    // Runs again when <Activity> shows the pet; if the cleanup stopped it mid-brake, nothing restarts the loop.
     if (!motionRef.current.frameId) setIsStepping(false);
 
     return () => {
