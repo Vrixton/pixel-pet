@@ -83,6 +83,7 @@ const NEAREST_TIE_BAND = 0.1;
 const WALK_TURN_PAUSE = (2 * WALK_STRIDE_IN_FRAME_WIDTHS * WALK_FRAME_WIDTH) / WALK_FRAMES / WALK_SPEED;
 const MAX_FRAME_GAP = 100;
 const INACTIVITY_DELAY = 120000;
+const IDLE_COOLDOWN = 30000;
 const NAP_DURATION = 2500;
 const STARTLE_DURATION = 300;
 const MENU_INSIST_OPENS = 4;
@@ -329,6 +330,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const actionRef = useRef<PetAction>(action);
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleCooldownRef = useRef<boolean>(false);
+  const idleCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEmotionFrozenRef = useRef<boolean>(false);
   const emotionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -565,8 +567,17 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       if (emotionTimerRef.current) clearTimeout(emotionTimerRef.current);
       if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
       if (clickBubbleTimerRef.current) clearTimeout(clickBubbleTimerRef.current);
+      if (idleCooldownTimerRef.current) clearTimeout(idleCooldownTimerRef.current);
     };
   }, []);
+
+  const startIdleCooldown = () => {
+    idleCooldownRef.current = true;
+    if (idleCooldownTimerRef.current) clearTimeout(idleCooldownTimerRef.current);
+    idleCooldownTimerRef.current = setTimeout(() => {
+      idleCooldownRef.current = false;
+    }, IDLE_COOLDOWN);
+  };
 
   useEffect(() => {
     if (action === 'sleep' || !canWalk || isMenuVisible || isResting) return;
@@ -576,11 +587,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
       actionTimerRef.current = setTimeout(() => {
         setAction('idle');
-        idleCooldownRef.current = true;
-
-        setTimeout(() => {
-          idleCooldownRef.current = false;
-        }, 30000);
+        startIdleCooldown();
       }, walkDuration);
     } else {
       const decideNextAction = () => {
@@ -694,10 +701,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     intentRef.current = null;
     stopMotion();
     setAction('idle');
-    idleCooldownRef.current = true;
-    setTimeout(() => {
-      idleCooldownRef.current = false;
-    }, 30000);
+    startIdleCooldown();
   };
 
   const stepMotion = (time: number) => {

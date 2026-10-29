@@ -386,6 +386,78 @@ describe('PixelPet walking', () => {
   });
 });
 
+describe('PixelPet idle cooldown', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('stands for 30 seconds after a walk before it may walk again', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValue(0.99);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    const stoppedAt = walker.style.transform;
+    for (let elapsed = 0; elapsed < 29000; elapsed += 1000) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+    expect(walker.style.transform).toBe(stoppedAt);
+
+    for (let elapsed = 0; elapsed < 6000; elapsed += 100) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+    expect(walker.style.transform).not.toBe(stoppedAt);
+  });
+
+  it('leaves no timer behind when it unmounts during the rest after a walk', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValue(0);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    const { unmount } = render(<PixelPet petName="Danko" />);
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-idle');
+    unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('leaves no timer behind when it unmounts after stopping at an edge', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    const { unmount } = render(<PixelPet petName="Danko" />);
+
+    for (let elapsed = 0; elapsed < 3000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+    }
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-idle');
+    unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
 describe('PixelPet emotions', () => {
   beforeEach(() => {
     vi.useFakeTimers();
