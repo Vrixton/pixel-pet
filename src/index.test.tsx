@@ -2318,7 +2318,7 @@ describe('PixelPet walk ramps', () => {
   const cruiseStep = 0.04 * 16;
 
   it('speeds up over about 200 ms when it starts a trip and slows down over about 200 ms before arriving', () => {
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(280);
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const handle = createRef<PixelPetHandle>();
     const { container } = render(<PixelPet petName="Danko" ref={handle} />);
@@ -2337,6 +2337,65 @@ describe('PixelPet walk ramps', () => {
     expect(firstCruise * 16).toBeLessThanOrEqual(240);
     expect(moving[moving.length - 1]).toBeLessThan(cruiseStep * 0.5);
     expect(container.querySelector('.pixel-pet-container')).toHaveClass('pixel-pet-rest-right');
+  });
+
+  it.each([
+    [280, 115, 0.04],
+    [300, 135, 135 / 3000],
+    [400, 235, 235 / 3000],
+    [1440, 1275, 0.12],
+  ])('crosses a %ipx parent (%ipx trip) at the speed for a 3 second trip, between 1 and 3 times the walk', (width, distance, speed) => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const onRestingChange = vi.fn();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} />);
+
+    act(() => {
+      handle.current?.rest('right');
+    });
+    const steps = sample(container, distance / speed + 1000);
+    const moving = steps.filter((step) => step > 0);
+
+    expect(Math.max(...moving)).toBeCloseTo(speed * 16, 5);
+    expect(moving.length * 16).toBeGreaterThanOrEqual(distance / speed);
+    expect(moving.length * 16).toBeLessThanOrEqual(distance / speed + 300);
+    expect(onRestingChange).toHaveBeenCalledWith('right');
+  });
+
+  it('keeps the speed it set off with when the parent resizes during the trip', () => {
+    let notifyResize: ((width: number) => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          notifyResize = (width) =>
+            callback([{ contentRect: { width } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+        }
+
+        observe() {}
+
+        disconnect() {}
+      },
+    );
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1440);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    act(() => {
+      handle.current?.rest('right');
+    });
+    sample(container, 3000);
+    const width = Math.round(getPositionX(container)) + 365;
+    clientWidth.mockReturnValue(width);
+    act(() => {
+      notifyResize?.(width);
+    });
+    const steps = sample(container, 1000);
+
+    expect(Math.max(...steps)).toBeCloseTo(0.12 * 16, 5);
+    vi.unstubAllGlobals();
   });
 
   it('brakes within a few pixels when something interrupts the walk', () => {

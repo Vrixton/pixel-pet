@@ -75,6 +75,8 @@ const WALK_ROW_Y = 73;
 const WALK_ROW_END = 600;
 const WALK_STRIDE_IN_FRAME_WIDTHS = 52 / 60;
 const WALK_RAMP = 200;
+const TRIP_DURATION = 3000;
+const TRIP_MAX_SPEED = WALK_SPEED * 3;
 const WALK_TURN_PAUSE = (2 * WALK_STRIDE_IN_FRAME_WIDTHS * WALK_FRAME_WIDTH) / WALK_FRAMES / WALK_SPEED;
 const MAX_FRAME_GAP = 100;
 const INACTIVITY_DELAY = 120000;
@@ -749,7 +751,12 @@ export const PixelPet: React.FC<PixelPetProps> = ({
       return;
     }
 
-    intentRef.current = { kind: 'trip', rest: restState, targetX, speed: WALK_SPEED };
+    const current = intentRef.current;
+    const speed =
+      current?.kind === 'trip' && current.rest === restState
+        ? current.speed
+        : Math.min(Math.max(Math.abs(targetX - posXRef.current) / TRIP_DURATION, WALK_SPEED), TRIP_MAX_SPEED);
+    intentRef.current = { kind: 'trip', rest: restState, targetX, speed };
     startMotion();
   }, [restState, stageWidth, canWalk]);
 
