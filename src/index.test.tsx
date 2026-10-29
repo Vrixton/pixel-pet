@@ -2926,6 +2926,27 @@ describe('PixelPet pixel snapping', () => {
     expect([...offsets].every((offset) => scaled.includes(offset))).toBe(true);
   });
 
+  it('does not move the pet again when a new measurement differs only by rounding noise', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const style = addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} spriteSrc="/pets/static.png" />);
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+
+    walkedPositions(container);
+    act(() => {
+      handle.current?.say('Hi');
+    });
+    walkedPositions(container);
+    style.textContent = '.pixel-pet-sprite { background-size: 1338.0000000001px 750px; }';
+    const transformSetter = vi.spyOn(walker.style, 'transform', 'set');
+    act(() => {
+      handle.current?.hush();
+    });
+
+    expect(transformSetter).not.toHaveBeenCalled();
+  });
+
   it('measures the sheet scale again each time it sets off', () => {
     vi.stubGlobal('Image', LoadedImage);
     const style = addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');

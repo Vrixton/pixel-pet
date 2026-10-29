@@ -70,6 +70,7 @@ const DEFAULT_CLOSE_LABEL = 'Close menu';
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
 const SHEET_WIDTH = 669;
+const PIXEL_UNIT_TOLERANCE = 1e-6;
 const WALK_SPEED = 0.04;
 const WALK_FRAMES = 9;
 const WALK_FRAME_WIDTH = 60;
@@ -653,7 +654,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     if (!sprite || !naturalWidth) return;
 
     const unit = getSheetWidth(sprite) / naturalWidth;
-    if (unit === pixelUnitRef.current) return;
+    if (Math.abs(unit - pixelUnitRef.current) < PIXEL_UNIT_TOLERANCE) return;
     pixelUnitRef.current = unit;
     applyPosition(posXRef.current);
   };
