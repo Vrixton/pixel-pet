@@ -14,6 +14,7 @@ interface PetMenuProps {
   label: string;
   closeLabel: string;
   actions: PetMenuAction[];
+  renderLabel: (label: string) => React.ReactNode;
   style?: CSSProperties;
   onSelect: (action: PetMenuAction) => void;
   onClose: () => void;
@@ -27,6 +28,7 @@ export const PetMenu = ({
   label,
   closeLabel,
   actions,
+  renderLabel,
   style,
   onSelect,
   onClose,
@@ -105,7 +107,7 @@ export const PetMenu = ({
               className="pixel-pet-menu-item"
               onClick={() => onSelect(action)}
             >
-              {action.label}
+              {renderLabel(action.label)}
             </button>
           </li>
         ))}
