@@ -1,7 +1,7 @@
 import { Activity, Profiler, createRef } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -2781,5 +2781,107 @@ describe('PixelPet pixel snapping', () => {
 
     expect(new Set(positions).size).toBeGreaterThan(10);
     expect(positions.every((x) => x % 3 === 0)).toBe(true);
+  });
+});
+
+describe("PixelPet rest('nearest')", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 100) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+  };
+
+  const renderPet = (width: number, props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+    const handle = createRef<PixelPetHandle>();
+    const onRestingChange = vi.fn();
+    render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} {...props} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    const rest = (command: 'left' | 'center' | 'right' | 'nearest') => {
+      act(() => {
+        handle.current?.rest(command);
+      });
+      advance(12000);
+    };
+    const wake = () => fireEvent.click(pet);
+    return { pet, rest, wake, onRestingChange };
+  };
+
+  it('goes to the closer edge and reports that side, never nearest', () => {
+    const near = renderPet(1000);
+
+    near.rest('nearest');
+
+    expect(near.onRestingChange).toHaveBeenLastCalledWith('left');
+    expect(near.onRestingChange.mock.calls.flat()).not.toContain('nearest');
+  });
+
+  it('picks the right edge when it is closer', () => {
+    const { rest, wake, onRestingChange } = renderPet(1000);
+
+    rest('right');
+    wake();
+    rest('nearest');
+
+    expect(onRestingChange).toHaveBeenLastCalledWith('right');
+  });
+
+  it.each([
+    ['right', 'left', 'right'],
+    ['left', 'right', 'left'],
+  ] as const)(
+    'keeps facing %s near the middle instead of turning around for a few pixels',
+    (facing, start, expected) => {
+      const { rest, wake, onRestingChange } = renderPet(400);
+
+      rest(start);
+      wake();
+      rest('center');
+      wake();
+      rest('nearest');
+
+      expect(onRestingChange).toHaveBeenLastCalledWith(expected);
+      expect(facing).toBe(expected);
+    },
+  );
+
+  it('decides the same way every time for the same facing direction', () => {
+    const results = [0, 1, 2].map(() => {
+      const { rest, wake, onRestingChange } = renderPet(400);
+      rest('left');
+      wake();
+      rest('center');
+      wake();
+      rest('nearest');
+      const last = onRestingChange.mock.lastCall?.[0];
+      cleanup();
+      return last;
+    });
+
+    expect(results).toEqual(['right', 'right', 'right']);
+  });
+
+  it('does nothing in showcase mode or while it is already resting', () => {
+    const showcase = renderPet(1000, { mode: 'showcase' });
+    showcase.rest('nearest');
+    expect(showcase.onRestingChange).not.toHaveBeenCalled();
+    cleanup();
+
+    const resting = renderPet(1000, { resting: 'right' });
+    resting.rest('nearest');
+    expect(resting.onRestingChange).not.toHaveBeenCalled();
+    expect(resting.pet).toHaveClass('pixel-pet-state-sleep');
   });
 });

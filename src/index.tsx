@@ -28,6 +28,7 @@ export type PetVariant = 'cat' | 'dog' | 'axolotl' | 'parakeet' | 'hamster';
 export type PetMode = 'live' | 'showcase';
 export type PetMessages = Partial<Record<PetEmotion | 'greeting', React.ReactNode>>;
 export type RestAt = 'left' | 'center' | 'right';
+export type RestCommand = RestAt | 'nearest';
 
 const REST_SPOTS: RestAt[] = ['left', 'center', 'right'];
 
@@ -45,7 +46,7 @@ export interface PixelPetHandle {
   say: (message: React.ReactNode, options?: PetSayOptions) => void;
   hush: () => void;
   emote: (emotion: PetEmotion) => void;
-  rest: (at: RestAt) => void;
+  rest: (at: RestCommand) => void;
 }
 
 const ACTIVITY_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
@@ -78,6 +79,7 @@ const WALK_STRIDE_IN_FRAME_WIDTHS = 52 / 60;
 const WALK_RAMP = 200;
 const TRIP_DURATION = 3000;
 const TRIP_MAX_SPEED = WALK_SPEED * 3;
+const NEAREST_TIE_BAND = 0.1;
 const WALK_TURN_PAUSE = (2 * WALK_STRIDE_IN_FRAME_WIDTHS * WALK_FRAME_WIDTH) / WALK_FRAMES / WALK_SPEED;
 const MAX_FRAME_GAP = 100;
 const INACTIVITY_DELAY = 120000;
@@ -340,6 +342,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     setSpeech(value);
   };
 
+  const resolveNearest = (): RestAt => {
+    const width = stageRef.current?.clientWidth ?? 0;
+    const toLeft = posXRef.current;
+    const toRight = Math.max(width - SPRITE_MAX_WIDTH, 0) - posXRef.current;
+    if (Math.abs(toLeft - toRight) < width * NEAREST_TIE_BAND) return facingRef.current;
+    return toLeft < toRight ? 'left' : 'right';
+  };
+
   const updateRestState = (value: RestState | null) => {
     restStateRef.current = value;
     standingAtRef.current = null;
@@ -399,9 +409,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
         if (isShowcase || restStateRef.current) return;
         triggerEmotion(emotion);
       },
-      rest: (at) => {
+      rest: (command) => {
         if (isShowcase || restStateRef.current) return;
 
+        const at = command === 'nearest' ? resolveNearest() : command;
         const trip: RestState = { at, phase: 'walking', origin: 'method' };
         if (canWalk) {
           updateRestState(trip);
