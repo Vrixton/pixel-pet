@@ -109,6 +109,31 @@ const getRestX = (at: RestAt, stageWidth: number) => {
   return maxX / 2;
 };
 
+const toCssString = (value: string) =>
+  `"${[...value]
+    .map((char) => {
+      const code = char.codePointAt(0)!;
+      if (code === 0) return '\uFFFD';
+      if (code <= 0x1f || code === 0x7f) return `\\${code.toString(16)} `;
+      if (char === '"' || char === '\\') return `\\${char}`;
+      return char;
+    })
+    .join('')}"`;
+
+const CSS_URL = /url\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^)\s]*))\s*\)/;
+const CSS_ESCAPE = /\\([0-9a-fA-F]{1,6})[ \t\n]?|\\([\s\S])/g;
+
+const fromCssCodePoint = (code: number) =>
+  code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff) ? '\uFFFD' : String.fromCodePoint(code);
+
+const readCssUrl = (value: string) => {
+  const match = value.match(CSS_URL);
+  const raw = match?.[1] ?? match?.[2] ?? match?.[3];
+  return raw?.replace(CSS_ESCAPE, (_, hex?: string, char?: string) =>
+    hex ? fromCssCodePoint(Number.parseInt(hex, 16)) : char === '\n' ? '' : char!,
+  );
+};
+
 interface RestState {
   at: RestAt;
   phase: 'walking' | 'asleep';
@@ -629,7 +654,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     naturalWidthRef.current = 0;
     pixelUnitRef.current = 1;
     const sprite = petRef.current;
-    const url = sprite && getComputedStyle(sprite).backgroundImage.match(/url\(\s*(['"]?)(.*?)\1\s*\)/)?.[2];
+    const url = sprite && readCssUrl(getComputedStyle(sprite).backgroundImage);
     if (!url) return;
 
     const image = new Image();
@@ -1165,7 +1190,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
           className={`pixel-pet-sprite pixel-pet-${variant} ${stateClass} ${
             direction === 'left' ? 'pixel-pet-flip-x' : ''
           }`}
-          style={spriteSrc ? { backgroundImage: `url("${spriteSrc}")` } : undefined}
+          style={spriteSrc ? { backgroundImage: `url(${toCssString(spriteSrc)})` } : undefined}
           onClick={handleClick}
           onKeyDown={handlePetKeyDown}
           onFocus={(event) => setIsFocused(event.currentTarget.matches(':focus-visible'))}

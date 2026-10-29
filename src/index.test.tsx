@@ -73,6 +73,45 @@ describe('PixelPet', () => {
     expect(getSprite(container)?.style.backgroundImage).toBe('url("/pets/my dog (v2).png")');
   });
 
+  const hostileSrc = 'x.png"); position: fixed; inset: 0; z-index: 99999; background: url("https://evil.example/t.png';
+
+  it('keeps a spriteSrc inside its url when the page is rendered on the server', () => {
+    const html = renderToString(<PixelPet petName="Danko" spriteSrc={hostileSrc} />);
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    const sprite = host.querySelector<HTMLElement>('.pixel-pet-sprite')!;
+    const parsed = document.createElement('div');
+    parsed.setAttribute('style', sprite.getAttribute('style') ?? '');
+
+    expect(parsed.style.length).toBe(1);
+    expect(parsed.style.position).toBe('');
+    expect(parsed.style.zIndex).toBe('');
+  });
+
+  it('hydrates an escaped spriteSrc without a mismatch', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<PixelPet petName="Danko" spriteSrc={hostileSrc} />);
+    document.body.appendChild(container);
+
+    act(() => {
+      hydrateRoot(container, <PixelPet petName="Danko" spriteSrc={hostileSrc} />);
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    container.remove();
+    consoleError.mockRestore();
+  });
+
+  it('still draws a spriteSrc that contains quotes, backslashes, or line breaks', () => {
+    ['/pets/"static".png', '/pets/back\\slash.png', '/pets/line\nbreak.png', hostileSrc].forEach((spriteSrc) => {
+      const { container, unmount } = render(<PixelPet spriteSrc={spriteSrc} />);
+
+      expect(getSprite(container)?.style.backgroundImage).toMatch(/^url\(/);
+      unmount();
+    });
+  });
+
   it('exposes the pet as a button named after the pet', () => {
     render(<PixelPet petName="Danko" />);
 
@@ -2733,6 +2772,16 @@ describe('PixelPet pixel snapping', () => {
     render(<PixelPet petName="Danko" spriteSrc="/pets/static (1).png" />);
 
     expect(requested).toEqual(['/pets/static (1).png']);
+  });
+
+  it('measures the exact sheet passed in spriteSrc, whatever characters its path has', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const paths = ['/pets/"static".png', '/pets/back\\slash.png', '/pets/line\nbreak.png', '/pets/naïve 🐱.png'];
+    paths.forEach((spriteSrc) => {
+      render(<PixelPet petName="Danko" spriteSrc={spriteSrc} />).unmount();
+    });
+
+    expect(requested).toEqual(paths);
   });
 
   it('reads a quoted sheet path with parentheses from the stylesheet', () => {
