@@ -115,6 +115,10 @@ Without `actions`, with an empty list, or in showcase mode, a click behaves as i
 pet.current?.rest('right');
 ```
 
+It also accepts `'nearest'`, which sends the pet to whichever edge is closer at that moment, left or right but never the center, since resting is how the user moves it out of the way. When the two edges are almost as close, with less than 10% of the container's width between the two distances, it keeps going the way it is facing instead of turning around for a few pixels. `'nearest'` is only a command: `onRestingChange` receives the side it picked, `'left'` or `'right'`, so you can store that. The method takes a `RestCommand`, while the `resting` prop and `onRestingChange` stay `RestAt | null`.
+
+Short trips happen at walking speed. Trips longer than 120px speed up so they last about three seconds, up to three times the walking speed for trips longer than 360px, so even crossing a wide screen takes only a few seconds.
+
 While resting, only a direct click on the pet wakes it up. Scrolling, moving the mouse, typing, `say()`, and `emote()` leave it alone. A click while it is still on its way cancels the trip. Calling `rest()` again while it is resting or on its way does nothing, and it is ignored in showcase mode.
 
 `onRestingChange` tells you when the state changes: it receives the spot once the pet is really asleep there, and `null` when the user wakes it up. A trip that was canceled reports nothing.
@@ -253,13 +257,29 @@ A sheet passed through `spriteSrc` has to follow the same layout as the bundled 
 
 ## How it behaves
 
-The pet wanders on its own, sometimes walking and sometimes standing, and turns around at the edges of the container. Every 30 seconds it may switch to a random mood for 5 seconds. Focusing it with the keyboard shows what it's feeling, and so does hovering over it with a mouse or a pen, which also holds the mood and keeps the pet in place until the pointer leaves, so the message can be read. Touch screens have no hover, so there the message only shows on a click. Without `actions`, clicking it shows its last mood for three seconds, and clicking it more than five times in ten seconds makes it angry. After a click, the bubble stays hidden while the pointer rests on the pet; moving the pointer away and back shows it again.
+The pet wanders on its own, sometimes walking and sometimes standing. It eases into each walk and slows down before stopping, over about 200ms. At an edge, or when it has to turn around to reach a resting spot, it slows to a stop, turns, and pauses for a moment before setting off again. Its feet follow the distance it covers rather than a clock, with one full stride every 52/60 of the rendered frame width, so they keep up at any speed. Its position snaps to the pixel grid of the sprite and then to whole physical pixels of the screen, so moving never changes how the art is drawn. Every 30 seconds it may switch to a random mood for 5 seconds. Focusing it with the keyboard shows what it's feeling, and so does hovering over it with a mouse or a pen, which also holds the mood and keeps the pet in place until the pointer leaves, so the message can be read. Touch screens have no hover, so there the message only shows on a click. Without `actions`, clicking it shows its last mood for three seconds, and clicking it more than five times in ten seconds makes it angry. After a click, the bubble stays hidden while the pointer rests on the pet; moving the pointer away and back shows it again.
+
+On screens with fractional scaling, such as 125% or 150%, one pixel of the sheet doesn't cover a whole number of physical pixels, so some of its pixels come out a physical pixel wider than others. That depends on the size the sprite is drawn at, not on the walk. If the sheet is rendered at a whole multiple of its source size in physical pixels, every pixel of the sheet has the same width and there is no shimmer at any scale.
 
 After two minutes without mouse, touch, keyboard, or scroll wheel activity on the page, it dozes off for a couple of seconds and wakes up by itself with a little start. It does it again every two minutes while the page stays quiet. It only stays asleep when you ask it to [rest](#resting), so a sleeping pet always means the same thing.
 
 With `mode="showcase"`, the pet stays in place playing its idle animation, with no random moods and no bubble on hover. Clicking it shows `messages.greeting`, or "Hi, I'm {name}!" by default, for three seconds, without getting angry however many times it is clicked. It still falls asleep after two minutes without activity and wakes up with any activity, because a showcase pet can't rest, so its sleep can't be confused with resting. `say()` and `hush()` keep working.
 
 The pet is a real button, so it can be reached with the keyboard, has a visible focus outline, and is announced with its name. With actions, it is announced as a menu button and its menu can be used entirely from the keyboard. When the user prefers reduced motion, it stays still, its animation pauses, and the bubble, the menu, and the start after a doze appear without motion.
+
+## Browser support
+
+Version 0.6.2 was checked in these engines:
+
+| Engine | Tested in | Device pixel ratios |
+| --- | --- | --- |
+| Blink | Chromium 141 | 1, 1.25, 1.5, and 2 |
+| Gecko | Firefox 159 | 1, 1.25, 1.5, and 2 |
+| WebKit | WebKitGTK 2.52 | 1 and 2 |
+
+In all three, the checks covered the walk and its speed, positions landing on whole physical pixels, how `spriteSrc` is escaped and measured, trips and `rest('nearest')`, and the menu from the keyboard. Reduced motion was checked in Chromium and Firefox, and accessibility with axe in Chromium.
+
+Safari hasn't been tested yet. It shares WebKit with WebKitGTK but composites differently on macOS and iOS. Mobile browsers haven't been tested either. If you find a problem in a browser, please [open an issue](https://github.com/Vrixton/pixel-pet/issues).
 
 ## Development
 
@@ -268,11 +288,12 @@ You need Node.js 24 or later and pnpm.
 ```bash
 pnpm install
 pnpm playground
+pnpm typecheck
 pnpm test
 pnpm build
 ```
 
-`pnpm playground` opens a local demo with Vite, `pnpm test` runs the tests with Vitest, and `pnpm build` builds the package with tsup.
+`pnpm playground` opens a local demo with Vite, `pnpm typecheck` checks the types of the source and the tests with TypeScript, `pnpm test` runs the tests with Vitest, and `pnpm build` builds the package with tsup.
 
 ## License
 

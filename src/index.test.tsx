@@ -1,7 +1,7 @@
-import { Profiler, createRef } from 'react';
+import { Activity, Profiler, createRef } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -71,6 +71,45 @@ describe('PixelPet', () => {
     const { container } = render(<PixelPet spriteSrc="/pets/my dog (v2).png" />);
 
     expect(getSprite(container)?.style.backgroundImage).toBe('url("/pets/my dog (v2).png")');
+  });
+
+  const hostileSrc = 'x.png"); position: fixed; inset: 0; z-index: 99999; background: url("https://evil.example/t.png';
+
+  it('keeps a spriteSrc inside its url when the page is rendered on the server', () => {
+    const html = renderToString(<PixelPet petName="Danko" spriteSrc={hostileSrc} />);
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    const sprite = host.querySelector<HTMLElement>('.pixel-pet-sprite')!;
+    const parsed = document.createElement('div');
+    parsed.setAttribute('style', sprite.getAttribute('style') ?? '');
+
+    expect(parsed.style.length).toBe(1);
+    expect(parsed.style.position).toBe('');
+    expect(parsed.style.zIndex).toBe('');
+  });
+
+  it('hydrates an escaped spriteSrc without a mismatch', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<PixelPet petName="Danko" spriteSrc={hostileSrc} />);
+    document.body.appendChild(container);
+
+    act(() => {
+      hydrateRoot(container, <PixelPet petName="Danko" spriteSrc={hostileSrc} />);
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    container.remove();
+    consoleError.mockRestore();
+  });
+
+  it('still draws a spriteSrc that contains quotes, backslashes, or line breaks', () => {
+    ['/pets/"static".png', '/pets/back\\slash.png', '/pets/line\nbreak.png', hostileSrc].forEach((spriteSrc) => {
+      const { container, unmount } = render(<PixelPet spriteSrc={spriteSrc} />);
+
+      expect(getSprite(container)?.style.backgroundImage).toMatch(/^url\(/);
+      unmount();
+    });
   });
 
   it('exposes the pet as a button named after the pet', () => {
@@ -285,6 +324,7 @@ describe('PixelPet reduced motion', () => {
 
   it('walks when the user has no motion preference', () => {
     mockReducedMotion(false);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
     render(<PixelPet petName="Danko" />);
 
     expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-walk');
@@ -314,6 +354,7 @@ describe('PixelPet walking', () => {
 
   it('tries again when the first roll says not to walk', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValue(0.99);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
 
@@ -328,6 +369,7 @@ describe('PixelPet walking', () => {
 
   it('stops walking when the walk duration ends', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValue(0);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
 
@@ -336,8 +378,83 @@ describe('PixelPet walking', () => {
     act(() => {
       vi.advanceTimersByTime(5000);
     });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
 
     expect(pet).toHaveClass('pixel-pet-state-idle');
+  });
+});
+
+describe('PixelPet idle cooldown', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('stands for 30 seconds after a walk before it may walk again', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValue(0.99);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    const stoppedAt = walker.style.transform;
+    for (let elapsed = 0; elapsed < 29000; elapsed += 1000) {
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+    expect(walker.style.transform).toBe(stoppedAt);
+
+    for (let elapsed = 0; elapsed < 6000; elapsed += 100) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+    expect(walker.style.transform).not.toBe(stoppedAt);
+  });
+
+  it('leaves no timer behind when it unmounts during the rest after a walk', () => {
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValue(0);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    const { unmount } = render(<PixelPet petName="Danko" />);
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-idle');
+    unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('leaves no timer behind when it unmounts after stopping at an edge', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    const { unmount } = render(<PixelPet petName="Danko" />);
+
+    for (let elapsed = 0; elapsed < 3000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+    }
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-idle');
+    unmount();
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -359,6 +476,7 @@ describe('PixelPet emotions', () => {
 
   it('shows an emotion every 30 seconds even when the action changes in between', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0).mockReturnValue(0);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
     render(<PixelPet petName="Danko" />);
     const pet = screen.getByRole('button', { name: 'Danko' });
 
@@ -808,6 +926,7 @@ describe('PixelPet say()', () => {
 
     advance(500);
     say('Hold on.');
+    advance(250);
     const transformWhileSpeaking = walker?.style.transform;
     advance(2000);
 
@@ -1670,6 +1789,7 @@ describe('PixelPet while the actions menu is open', () => {
     expect(pet).toHaveClass('pixel-pet-state-walk');
 
     fireEvent.click(pet);
+    advance(250);
     const openedAt = getPositionX(container);
     advance(2000);
 
@@ -1799,7 +1919,7 @@ describe('PixelPet rest', () => {
 
   it.each([
     ['left', 0],
-    ['center', 117.5],
+    ['center', 118],
   ] as const)('rests at the %s of its parent and wakes up right there', (at, x) => {
     const { container, pet, rest } = renderPet();
 
@@ -1842,6 +1962,7 @@ describe('PixelPet rest', () => {
     rest('right');
     advance(1000);
     fireEvent.click(pet);
+    advance(300);
     const stoppedAt = getPositionX(container);
     advance(4000);
 
@@ -2184,5 +2305,821 @@ describe('PixelPet insistence anger', () => {
     }
 
     expect(pet).not.toHaveClass('pixel-pet-state-angry');
+  });
+});
+
+describe('PixelPet walk frames', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const getFrameX = (pet: HTMLElement) => Number(pet.style.backgroundPosition.match(/^-?(\d+)px/)?.[1] ?? 0);
+
+  const walkFor = (ms: number, frameWidth = 60) => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(frameWidth);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    const frames: number[] = [];
+    const distances: number[] = [];
+    for (let elapsed = 0; elapsed < ms; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      frames.push(getFrameX(pet));
+      distances.push(Math.abs(getPositionX(container) - 100));
+    }
+    return { pet, frames, distances };
+  };
+
+  const expectedFrameX = (distance: number, frameWidth: number) => {
+    const frame = Math.floor(Math.max(distance, 0) / (((52 / 60) * frameWidth) / 9)) % 9;
+    return Math.round((frame * 600) / 9);
+  };
+
+  const possibleFrameX = (drawnDistance: number, frameWidth: number) => [
+    expectedFrameX(drawnDistance - 0.5, frameWidth),
+    expectedFrameX(drawnDistance + 0.5, frameWidth),
+  ];
+
+  it('picks the walk frame from the distance walked, one stride every 52px at the current size', () => {
+    const { frames, distances } = walkFor(3000);
+
+    frames.forEach((frameX, index) => {
+      expect(possibleFrameX(distances[index], 60)).toContain(frameX);
+    });
+    expect(new Set(frames).size).toBe(9);
+  });
+
+  it('keeps the stride proportional to the rendered frame width', () => {
+    const { frames, distances } = walkFor(3000, 120);
+
+    frames.forEach((frameX, index) => {
+      expect(possibleFrameX(distances[index], 120)).toContain(frameX);
+    });
+  });
+
+  it('measures the rendered frame once per walk instead of on every step', () => {
+    let spriteReads = 0;
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('pixel-pet-sprite')) spriteReads += 1;
+      return 60;
+    });
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    render(<PixelPet petName="Danko" />);
+
+    for (let elapsed = 0; elapsed < 2000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+    }
+
+    expect(spriteReads).toBe(1);
+  });
+
+  it('goes back to the stylesheet animation once it stops walking', () => {
+    const { pet } = walkFor(1000);
+
+    expect(pet.style.backgroundPosition).not.toBe('');
+
+    act(() => {
+      vi.advanceTimersByTime(13000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(pet).toHaveClass('pixel-pet-state-idle');
+    expect(pet.style.backgroundPosition).toBe('');
+  });
+});
+
+describe('PixelPet walk ramps', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const getPositionX = (container: HTMLElement) => {
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+    return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
+  };
+
+  const track = (container: HTMLElement, ms: number) => {
+    const positions: number[] = [];
+    let arrivedAt = -1;
+    for (let elapsed = 16; elapsed <= ms; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+      const resting = [...walker.classList].some((name) => name.startsWith('pixel-pet-rest-'));
+      if (resting && arrivedAt < 0) arrivedAt = elapsed;
+      positions.push(resting ? NaN : getPositionX(container));
+    }
+    return { positions, arrivedAt };
+  };
+
+  const sample = (container: HTMLElement, ms: number) => {
+    const positions = [getPositionX(container)];
+    for (let elapsed = 0; elapsed < ms; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      positions.push(getPositionX(container));
+    }
+    return positions.slice(1).map((x, index) => Math.abs(x - positions[index]));
+  };
+
+  const startTrip = (width: number) => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const onRestingChange = vi.fn();
+    const view = render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} />);
+    act(() => {
+      handle.current?.rest('right');
+    });
+    return { ...view, onRestingChange };
+  };
+
+  it('speeds up over about 200 ms when it starts a trip and slows down over about 200 ms before arriving', () => {
+    const { container } = startTrip(280);
+    const { positions, arrivedAt } = track(container, 4000);
+    const at = (ms: number) => positions[ms / 16 - 1];
+
+    expect(at(96) - 100).toBeLessThanOrEqual(2);
+    expect(at(992) - 100).toBeGreaterThanOrEqual(34);
+    expect(at(992) - 100).toBeLessThanOrEqual(37);
+    expect(arrivedAt).toBeGreaterThan(0);
+    const beforeArrival = positions[(arrivedAt - 208) / 16 - 1];
+    expect(215 - beforeArrival).toBeGreaterThanOrEqual(3);
+    expect(215 - beforeArrival).toBeLessThanOrEqual(6);
+  });
+
+  it.each([
+    [280, 115, 0.04],
+    [300, 135, 135 / 3000],
+    [400, 235, 235 / 3000],
+    [1440, 1275, 0.12],
+  ])('crosses a %ipx parent (%ipx trip) at the speed for a 3 second trip, between 1 and 3 times the walk', (width, distance, speed) => {
+    const { container, onRestingChange } = startTrip(width);
+    const { positions, arrivedAt } = track(container, distance / speed + 1000);
+    const mid = Math.floor(distance / speed / 2 / 16);
+    const cruise = positions[mid + 31] - positions[mid - 32];
+
+    expect(cruise).toBeGreaterThanOrEqual(speed * 1008 - 1.5);
+    expect(cruise).toBeLessThanOrEqual(speed * 1008 + 1.5);
+    expect(arrivedAt).toBeGreaterThanOrEqual(distance / speed);
+    expect(arrivedAt).toBeLessThanOrEqual(distance / speed + 400);
+    expect(onRestingChange).toHaveBeenCalledWith('right');
+  });
+
+  it('keeps the speed it set off with when the parent resizes during the trip', () => {
+    let notifyResize: ((width: number) => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          notifyResize = (width) =>
+            callback([{ contentRect: { width } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+        }
+
+        observe() {}
+
+        disconnect() {}
+      },
+    );
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1440);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    act(() => {
+      handle.current?.rest('right');
+    });
+    sample(container, 3000);
+    const width = Math.round(getPositionX(container)) + 365;
+    clientWidth.mockReturnValue(width);
+    act(() => {
+      notifyResize?.(width);
+    });
+    const resized = getPositionX(container);
+    sample(container, 1000);
+
+    expect(getPositionX(container) - resized).toBeGreaterThanOrEqual(118);
+    vi.unstubAllGlobals();
+  });
+
+  it('takes the trip target and the walking edges from the same container width', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+
+        disconnect() {}
+      },
+    );
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    clientWidth.mockReturnValue(600);
+    act(() => {
+      handle.current?.rest('right');
+    });
+    const { positions } = track(container, 12000);
+    const walked = positions.filter((x) => !Number.isNaN(x));
+
+    expect(Math.max(...walked)).toBe(935);
+    vi.unstubAllGlobals();
+  });
+
+  it('brakes within a few pixels when something interrupts the walk', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    track(container, 1008);
+    act(() => {
+      handle.current?.say('Wait');
+    });
+    const before = getPositionX(container);
+    const { positions } = track(container, 608);
+
+    expect(getPositionX(container) - before).toBeGreaterThan(0);
+    expect(getPositionX(container) - before).toBeLessThanOrEqual(5);
+    expect(new Set(positions.slice(-10)).size).toBe(1);
+  });
+
+  it('stops at the edge, faces the other way for a moment, then sets off again', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    const positions: number[] = [];
+    const flipped: boolean[] = [];
+    for (let elapsed = 0; elapsed < 2400; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      positions.push(getPositionX(container));
+      flipped.push(pet.classList.contains('pixel-pet-flip-x'));
+    }
+
+    const atEdge = positions.indexOf(135);
+    const turned = flipped.indexOf(true);
+    const leaves = positions.findIndex((x, index) => index > turned && x < 135);
+
+    expect(atEdge).toBeGreaterThan(0);
+    expect(turned).toBeGreaterThanOrEqual(atEdge);
+    expect((leaves - turned) * 16).toBeGreaterThanOrEqual(270);
+    expect(Math.max(...positions)).toBe(135);
+  });
+
+  const walkUntil = (container: HTMLElement, reached: (x: number) => boolean) => {
+    for (let elapsed = 0; elapsed < 20000 && !reached(getPositionX(container)); elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+    }
+  };
+
+  it('walks again after being hidden and shown while it was walking', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container, rerender } = render(
+      <Activity mode="visible">
+        <PixelPet petName="Danko" />
+      </Activity>,
+    );
+
+    sample(container, 500);
+    rerender(
+      <Activity mode="hidden">
+        <PixelPet petName="Danko" />
+      </Activity>,
+    );
+    rerender(
+      <Activity mode="visible">
+        <PixelPet petName="Danko" />
+      </Activity>,
+    );
+    const shown = getPositionX(container);
+    sample(container, 500);
+
+    expect(getPositionX(container) - shown).toBeGreaterThan(10);
+  });
+
+  it('stands idle after being hidden while braking and shown again', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container, rerender } = render(
+      <Activity mode="visible">
+        <PixelPet petName="Danko" ref={handle} />
+      </Activity>,
+    );
+
+    sample(container, 500);
+    act(() => {
+      handle.current?.say('Wait');
+    });
+    sample(container, 48);
+    rerender(
+      <Activity mode="hidden">
+        <PixelPet petName="Danko" ref={handle} />
+      </Activity>,
+    );
+    rerender(
+      <Activity mode="visible">
+        <PixelPet petName="Danko" ref={handle} />
+      </Activity>,
+    );
+    const shown = getPositionX(container);
+    sample(container, 300);
+
+    expect(getPositionX(container)).toBe(shown);
+    expect(container.querySelector('.pixel-pet-sprite')).not.toHaveClass('pixel-pet-state-walk');
+  });
+
+  it('brakes before turning around, then faces the other way for a moment before setting off', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    sample(container, 1000);
+    act(() => {
+      handle.current?.rest('left');
+    });
+
+    const positions = [getPositionX(container)];
+    const flipped: boolean[] = [pet.classList.contains('pixel-pet-flip-x')];
+    for (let elapsed = 0; elapsed < 1200; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      positions.push(getPositionX(container));
+      flipped.push(pet.classList.contains('pixel-pet-flip-x'));
+    }
+    const turned = flipped.indexOf(true);
+    const leaves = positions.findIndex((x, index) => index > turned && x < positions[turned]);
+
+    expect(flipped[0]).toBe(false);
+    expect(positions[1]).toBeGreaterThan(positions[0]);
+    expect(positions[turned] - positions[0]).toBeLessThanOrEqual(4.5);
+    expect((leaves - turned) * 16).toBeGreaterThanOrEqual(270);
+  });
+
+  it('sets off at once when a trip starts while it pauses at an edge', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    for (let elapsed = 0; elapsed < 4000 && !pet.classList.contains('pixel-pet-flip-x'); elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+    }
+    act(() => {
+      handle.current?.rest('left');
+    });
+    sample(container, 100);
+
+    expect(getPositionX(container)).toBeLessThan(135);
+  });
+
+  it('stops on the spot when walking is turned off', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container, rerender } = render(<PixelPet petName="Danko" />);
+
+    sample(container, 1000);
+    rerender(<PixelPet petName="Danko" walk={false} />);
+    const steps = sample(container, 300);
+
+    expect(steps.every((step) => step === 0)).toBe(true);
+    expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('pixel-pet-state-walk');
+  });
+
+  it('never brakes past the edge of a container that shrinks while it slows down', () => {
+    let notifyResize: ((width: number) => void) | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          notifyResize = (width) =>
+            callback([{ contentRect: { width } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+        }
+
+        observe() {}
+
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    sample(container, 1000);
+    const edge = Math.ceil(getPositionX(container)) + 1;
+    act(() => {
+      handle.current?.say('Wait');
+      notifyResize?.(edge + 65);
+    });
+    sample(container, 400);
+
+    expect(getPositionX(container)).toBeLessThanOrEqual(edge);
+    vi.unstubAllGlobals();
+  });
+
+  it('stands idle instead of walking in place when there is no room to walk', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    render(<PixelPet petName="Danko" />);
+
+    expect(screen.getByRole('button', { name: 'Danko' })).toHaveClass('pixel-pet-state-idle');
+  });
+
+  it('places the bubble again once the pet has braked to a stop', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('pixel-pet-dialog') ? 180 : 60;
+    });
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
+
+    walkUntil(container, (x) => x >= 185);
+    act(() => {
+      handle.current?.say('Wait');
+    });
+    sample(container, 400);
+    const dialog = container.querySelector<HTMLElement>('.pixel-pet-dialog');
+
+    expect(getPositionX(container) + parseFloat(dialog?.style.left ?? '') + 180).toBeCloseTo(296, 5);
+  });
+
+  it('places the menu again once the pet has braked to a stop', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('pixel-pet-menu') ? 180 : 60;
+    });
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+    const { container } = render(
+      <PixelPet petName="Danko" actions={[{ id: 'pet', label: 'Pet', onSelect: () => {} }]} />,
+    );
+
+    walkUntil(container, (x) => x >= 185);
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    sample(container, 400);
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(getPositionX(container) + parseFloat(menu?.style.left ?? '') + 180).toBeCloseTo(296, 5);
+  });
+
+  it('does not fall asleep when the trip was canceled before the next frame', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const onRestingChange = vi.fn();
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} />);
+
+    act(() => {
+      handle.current?.rest('right');
+    });
+    walkUntil(container, (x) => x >= 230);
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(onRestingChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('pixel-pet-state-sleep');
+  });
+});
+
+describe('PixelPet pixel snapping', () => {
+  const requested: string[] = [];
+
+  class LoadedImage {
+    naturalWidth = 669;
+
+    private onLoad: (() => void) | undefined;
+
+    addEventListener(type: string, listener: () => void) {
+      if (type === 'load') this.onLoad = listener;
+    }
+
+    removeEventListener() {}
+
+    set src(value: string) {
+      requested.push(value);
+      setTimeout(() => this.onLoad?.(), 0);
+    }
+  }
+
+  const addSheetStyle = (css: string) => {
+    const style = document.createElement('style');
+    style.id = 'scaled-sheet';
+    style.textContent = css;
+    document.head.appendChild(style);
+    return style;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.head.querySelector('#scaled-sheet')?.remove();
+    requested.length = 0;
+  });
+
+  const walkedPositions = (container: HTMLElement) => {
+    const positions: number[] = [];
+    for (let elapsed = 0; elapsed < 2000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+      positions.push(Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]));
+    }
+    return positions;
+  };
+
+  it('draws whole pixels before the sprite image has loaded', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(20);
+    expect(positions.every(Number.isInteger)).toBe(true);
+  });
+
+  it.each([1.25, 1.5, 1.75])('draws on whole physical pixels at a device pixel ratio of %s', (dpr) => {
+    vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(dpr);
+    const { container } = render(<PixelPet petName="Danko" />);
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(20);
+    positions.forEach((x) => {
+      expect(Math.abs(x * dpr - Math.round(x * dpr))).toBeLessThan(1e-6);
+    });
+  });
+
+  it('snaps to one source pixel of a sheet the page has scaled up', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const style = document.createElement('style');
+    style.id = 'scaled-sheet';
+    style.textContent = '.pixel-pet-sprite { background-size: 1338px 750px; }';
+    document.head.appendChild(style);
+    const { container } = render(<PixelPet petName="Danko" spriteSrc="/pets/static.png" />);
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(10);
+    expect(positions.every((x) => x % 2 === 0)).toBe(true);
+  });
+
+  it('reads the sheet passed in spriteSrc even with parentheses in its path', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    render(<PixelPet petName="Danko" spriteSrc="/pets/static (1).png" />);
+
+    expect(requested).toEqual(['/pets/static (1).png']);
+  });
+
+  it('measures the exact sheet passed in spriteSrc, whatever characters its path has', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const paths = ['/pets/"static".png', '/pets/back\\slash.png', '/pets/line\nbreak.png', '/pets/naïve 🐱.png'];
+    paths.forEach((spriteSrc) => {
+      render(<PixelPet petName="Danko" spriteSrc={spriteSrc} />).unmount();
+    });
+
+    expect(requested).toEqual(paths);
+  });
+
+  it('reads a quoted sheet path with parentheses from the stylesheet', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    addSheetStyle('.pixel-pet-sprite { background-image: url("/pets/static (1).png"); }');
+    render(<PixelPet petName="Danko" />);
+
+    expect(requested).toEqual(['/pets/static (1).png']);
+  });
+
+  it('moves the walk frames by the scaled sheet, not by the source sheet', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');
+    render(<PixelPet petName="Danko" spriteSrc="/pets/static.png" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    const offsets = new Set<string>();
+    for (let elapsed = 0; elapsed < 3000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      if (pet.style.backgroundPosition) offsets.add(pet.style.backgroundPosition);
+    }
+    const scaled = Array.from({ length: 9 }, (_, frame) => `${-Math.round((frame * 600) / 9) * 2}px -146px`);
+
+    expect(offsets.size).toBe(9);
+    expect([...offsets].every((offset) => scaled.includes(offset))).toBe(true);
+  });
+
+  it('warns once with the path when the sheet cannot be loaded', () => {
+    class BrokenImage {
+      naturalWidth = 0;
+
+      private onError: (() => void) | undefined;
+
+      addEventListener(type: string, listener: () => void) {
+        if (type === 'error') this.onError = listener;
+      }
+
+      removeEventListener() {}
+
+      set src(_value: string) {
+        setTimeout(() => this.onError?.(), 0);
+      }
+    }
+    vi.stubGlobal('Image', BrokenImage);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<PixelPet petName="Danko" spriteSrc="/pets/missing.png" />);
+
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('/pets/missing.png');
+  });
+
+  it('does not move the pet again when a new measurement differs only by rounding noise', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const style = addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} spriteSrc="/pets/static.png" />);
+    const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+
+    walkedPositions(container);
+    act(() => {
+      handle.current?.say('Hi');
+    });
+    walkedPositions(container);
+    style.textContent = '.pixel-pet-sprite { background-size: 1338.0000000001px 750px; }';
+    const transformSetter = vi.spyOn(walker.style, 'transform', 'set');
+    act(() => {
+      handle.current?.hush();
+    });
+
+    expect(transformSetter).not.toHaveBeenCalled();
+  });
+
+  it('measures the sheet scale again each time it sets off', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const style = addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} spriteSrc="/pets/static.png" />);
+
+    walkedPositions(container);
+    style.textContent = '.pixel-pet-sprite { background-size: 2007px 1125px; }';
+    act(() => {
+      handle.current?.say('Hi');
+    });
+    walkedPositions(container);
+    act(() => {
+      handle.current?.hush();
+    });
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(10);
+    expect(positions.every((x) => x % 3 === 0)).toBe(true);
+  });
+});
+
+describe("PixelPet rest('nearest')", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const advance = (ms: number) => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 100) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+  };
+
+  const renderPet = (width: number, props: Partial<React.ComponentProps<typeof PixelPet>> = {}) => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+    const handle = createRef<PixelPetHandle>();
+    const onRestingChange = vi.fn();
+    render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} {...props} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+    const rest = (command: 'left' | 'center' | 'right' | 'nearest') => {
+      act(() => {
+        handle.current?.rest(command);
+      });
+      advance(12000);
+    };
+    const wake = () => fireEvent.click(pet);
+    return { pet, rest, wake, onRestingChange };
+  };
+
+  it('goes to the closer edge and reports that side, never nearest', () => {
+    const near = renderPet(1000);
+
+    near.rest('nearest');
+
+    expect(near.onRestingChange).toHaveBeenLastCalledWith('left');
+    expect(near.onRestingChange.mock.calls.flat()).not.toContain('nearest');
+  });
+
+  it('picks the right edge when it is closer', () => {
+    const { rest, wake, onRestingChange } = renderPet(1000);
+
+    rest('right');
+    wake();
+    rest('nearest');
+
+    expect(onRestingChange).toHaveBeenLastCalledWith('right');
+  });
+
+  it.each([
+    ['right', 'left', 'right'],
+    ['left', 'right', 'left'],
+  ] as const)(
+    'keeps facing %s near the middle instead of turning around for a few pixels',
+    (facing, start, expected) => {
+      const { rest, wake, onRestingChange } = renderPet(400);
+
+      rest(start);
+      wake();
+      rest('center');
+      wake();
+      rest('nearest');
+
+      expect(onRestingChange).toHaveBeenLastCalledWith(expected);
+      expect(facing).toBe(expected);
+    },
+  );
+
+  it('decides the same way every time for the same facing direction', () => {
+    const results = [0, 1, 2].map(() => {
+      const { rest, wake, onRestingChange } = renderPet(400);
+      rest('left');
+      wake();
+      rest('center');
+      wake();
+      rest('nearest');
+      const last = onRestingChange.mock.lastCall?.[0];
+      cleanup();
+      return last;
+    });
+
+    expect(results).toEqual(['right', 'right', 'right']);
+  });
+
+  it('does nothing in showcase mode or while it is already resting', () => {
+    const showcase = renderPet(1000, { mode: 'showcase' });
+    showcase.rest('nearest');
+    expect(showcase.onRestingChange).not.toHaveBeenCalled();
+    cleanup();
+
+    const resting = renderPet(1000, { resting: 'right' });
+    resting.rest('nearest');
+    expect(resting.onRestingChange).not.toHaveBeenCalled();
+    expect(resting.pet).toHaveClass('pixel-pet-state-sleep');
   });
 });
