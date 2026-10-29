@@ -274,11 +274,12 @@ You need Node.js 24 or later and pnpm.
 ```bash
 pnpm install
 pnpm playground
+pnpm typecheck
 pnpm test
 pnpm build
 ```
 
-`pnpm playground` opens a local demo with Vite, `pnpm test` runs the tests with Vitest, and `pnpm build` builds the package with tsup.
+`pnpm playground` opens a local demo with Vite, `pnpm typecheck` checks the types of the source and the tests with TypeScript, `pnpm test` runs the tests with Vitest, and `pnpm build` builds the package with tsup.
 
 ## License
 

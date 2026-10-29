@@ -30,7 +30,8 @@
     "playground": "vite",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "pnpm test && pnpm build"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "peerDependencies": {
     "react": "^19"
