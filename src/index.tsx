@@ -250,6 +250,8 @@ export const PixelPet: React.FC<PixelPetProps> = ({
 
   const posXRef = useRef<number>(INITIAL_POSITION);
   const travelledRef = useRef<number>(0);
+  const pixelUnitRef = useRef<number>(1);
+  const naturalWidthRef = useRef<number>(0);
   const walkFrameRef = useRef<number>(-1);
   const strideRef = useRef<number>(0);
   const [stageWidth, setStageWidth] = useState<number>(0);
@@ -561,6 +563,11 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     };
   }, [action, canWalk, isMenuVisible, isResting]);
 
+  const getDrawnX = () => {
+    const unit = pixelUnitRef.current;
+    return Math.round(posXRef.current / unit) * unit;
+  };
+
   const stepWalkFrames = (distance: number) => {
     const sprite = petRef.current;
     if (!sprite) return;
@@ -586,8 +593,38 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const applyPosition = (x: number) => {
     posXRef.current = x;
     if (restStateRef.current?.phase === 'asleep') return;
-    if (walkerRef.current) walkerRef.current.style.transform = `translateX(${x}px)`;
+    if (walkerRef.current) walkerRef.current.style.transform = `translateX(${getDrawnX()}px)`;
   };
+
+  const measurePixelUnit = () => {
+    const sprite = petRef.current;
+    const naturalWidth = naturalWidthRef.current;
+    if (!sprite || !naturalWidth) return;
+
+    const sheetWidth = Number(getComputedStyle(sprite).backgroundSize.match(/^([\d.]+)px/)?.[1]);
+    const unit = (sheetWidth || naturalWidth) / naturalWidth;
+    if (unit === pixelUnitRef.current) return;
+    pixelUnitRef.current = unit;
+    applyPosition(posXRef.current);
+  };
+
+  useEffect(() => {
+    naturalWidthRef.current = 0;
+    pixelUnitRef.current = 1;
+    const sprite = petRef.current;
+    const url = sprite && getComputedStyle(sprite).backgroundImage.match(/url\(\s*(['"]?)(.*?)\1\s*\)/)?.[2];
+    if (!url) return;
+
+    const image = new Image();
+    const handleLoad = () => {
+      naturalWidthRef.current = image.naturalWidth;
+      measurePixelUnit();
+    };
+
+    image.addEventListener('load', handleLoad);
+    image.src = url;
+    return () => image.removeEventListener('load', handleLoad);
+  }, [variant, spriteSrc]);
 
   const face = (facing: Facing) => {
     facingRef.current = facing;
@@ -606,6 +643,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const motion = motionRef.current;
     if (motion.frameId) return;
     motion.lastTime = null;
+    measurePixelUnit();
     setIsStepping(true);
     motion.frameId = requestAnimationFrame((time) => motionStepRef.current(time));
   };
@@ -958,10 +996,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const dialog = dialogRef.current;
     if (!isDialogVisible || !stage || !walker || !dialog) return;
 
-    const petCenter = posXRef.current + walker.offsetWidth / 2;
-    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, dialog.offsetWidth);
+    const drawnX = getDrawnX();
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, drawnX + walker.offsetWidth / 2, dialog.offsetWidth);
 
-    setDialogPlacement({ left: left - posXRef.current, maxWidth });
+    setDialogPlacement({ left: left - drawnX, maxWidth });
   }, [isDialogVisible, visibleEmotion, speech, stageWidth, isStepping]);
 
   useEffect(() => {
@@ -987,10 +1025,15 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     }
     if (!stage || !walker || !menu) return;
 
-    const petCenter = posXRef.current + walker.offsetWidth / 2;
-    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth, Infinity);
+    const drawnX = getDrawnX();
+    const { left, maxWidth } = getContainedPlacement(
+      stage.clientWidth,
+      drawnX + walker.offsetWidth / 2,
+      menu.offsetWidth,
+      Infinity,
+    );
 
-    setMenuPlacement({ left: left - posXRef.current, maxWidth });
+    setMenuPlacement({ left: left - drawnX, maxWidth });
   }, [isMenuVisible, actions, stageWidth, isStepping]);
 
   const getCurrentStateClass = () => {

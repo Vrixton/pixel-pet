@@ -1808,7 +1808,7 @@ describe('PixelPet rest', () => {
 
   it.each([
     ['left', 0],
-    ['center', 117.5],
+    ['center', 118],
   ] as const)('rests at the %s of its parent and wakes up right there', (at, x) => {
     const { container, pet, rest } = renderPet();
 
@@ -2233,15 +2233,20 @@ describe('PixelPet walk frames', () => {
   };
 
   const expectedFrameX = (distance: number, frameWidth: number) => {
-    const frame = Math.floor(distance / (((52 / 60) * frameWidth) / 9)) % 9;
+    const frame = Math.floor(Math.max(distance, 0) / (((52 / 60) * frameWidth) / 9)) % 9;
     return Math.round((frame * 600) / 9);
   };
+
+  const possibleFrameX = (drawnDistance: number, frameWidth: number) => [
+    expectedFrameX(drawnDistance - 0.5, frameWidth),
+    expectedFrameX(drawnDistance + 0.5, frameWidth),
+  ];
 
   it('picks the walk frame from the distance walked, one stride every 52px at the current size', () => {
     const { frames, distances } = walkFor(3000);
 
     frames.forEach((frameX, index) => {
-      expect(frameX).toBe(expectedFrameX(distances[index], 60));
+      expect(possibleFrameX(distances[index], 60)).toContain(frameX);
     });
     expect(new Set(frames).size).toBe(9);
   });
@@ -2250,7 +2255,7 @@ describe('PixelPet walk frames', () => {
     const { frames, distances } = walkFor(3000, 120);
 
     frames.forEach((frameX, index) => {
-      expect(frameX).toBe(expectedFrameX(distances[index], 120));
+      expect(possibleFrameX(distances[index], 120)).toContain(frameX);
     });
   });
 
@@ -2304,6 +2309,21 @@ describe('PixelPet walk ramps', () => {
     return Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]);
   };
 
+  const track = (container: HTMLElement, ms: number) => {
+    const positions: number[] = [];
+    let arrivedAt = -1;
+    for (let elapsed = 16; elapsed <= ms; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      const walker = container.querySelector<HTMLElement>('.pixel-pet-container')!;
+      const resting = [...walker.classList].some((name) => name.startsWith('pixel-pet-rest-'));
+      if (resting && arrivedAt < 0) arrivedAt = elapsed;
+      positions.push(resting ? NaN : getPositionX(container));
+    }
+    return { positions, arrivedAt };
+  };
+
   const sample = (container: HTMLElement, ms: number) => {
     const positions = [getPositionX(container)];
     for (let elapsed = 0; elapsed < ms; elapsed += 16) {
@@ -2315,28 +2335,30 @@ describe('PixelPet walk ramps', () => {
     return positions.slice(1).map((x, index) => Math.abs(x - positions[index]));
   };
 
-  const cruiseStep = 0.04 * 16;
-
-  it('speeds up over about 200 ms when it starts a trip and slows down over about 200 ms before arriving', () => {
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(280);
+  const startTrip = (width: number) => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const handle = createRef<PixelPetHandle>();
-    const { container } = render(<PixelPet petName="Danko" ref={handle} />);
-
+    const onRestingChange = vi.fn();
+    const view = render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} />);
     act(() => {
       handle.current?.rest('right');
     });
-    const steps = sample(container, 4000);
-    const moving = steps.filter((step) => step > 0);
+    return { ...view, onRestingChange };
+  };
 
-    expect(moving[0]).toBeLessThan(cruiseStep * 0.3);
-    expect(moving.slice(0, 10)).toEqual([...moving.slice(0, 10)].sort((a, b) => a - b));
-    expect(Math.max(...moving)).toBeCloseTo(cruiseStep, 5);
-    const firstCruise = moving.findIndex((step) => step >= cruiseStep - 1e-9);
-    expect(firstCruise * 16).toBeGreaterThanOrEqual(160);
-    expect(firstCruise * 16).toBeLessThanOrEqual(240);
-    expect(moving[moving.length - 1]).toBeLessThan(cruiseStep * 0.5);
-    expect(container.querySelector('.pixel-pet-container')).toHaveClass('pixel-pet-rest-right');
+  it('speeds up over about 200 ms when it starts a trip and slows down over about 200 ms before arriving', () => {
+    const { container } = startTrip(280);
+    const { positions, arrivedAt } = track(container, 4000);
+    const at = (ms: number) => positions[ms / 16 - 1];
+
+    expect(at(96) - 100).toBeLessThanOrEqual(2);
+    expect(at(992) - 100).toBeGreaterThanOrEqual(34);
+    expect(at(992) - 100).toBeLessThanOrEqual(37);
+    expect(arrivedAt).toBeGreaterThan(0);
+    const beforeArrival = positions[(arrivedAt - 208) / 16 - 1];
+    expect(215 - beforeArrival).toBeGreaterThanOrEqual(3);
+    expect(215 - beforeArrival).toBeLessThanOrEqual(6);
   });
 
   it.each([
@@ -2345,21 +2367,15 @@ describe('PixelPet walk ramps', () => {
     [400, 235, 235 / 3000],
     [1440, 1275, 0.12],
   ])('crosses a %ipx parent (%ipx trip) at the speed for a 3 second trip, between 1 and 3 times the walk', (width, distance, speed) => {
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const handle = createRef<PixelPetHandle>();
-    const onRestingChange = vi.fn();
-    const { container } = render(<PixelPet petName="Danko" ref={handle} onRestingChange={onRestingChange} />);
+    const { container, onRestingChange } = startTrip(width);
+    const { positions, arrivedAt } = track(container, distance / speed + 1000);
+    const mid = Math.floor(distance / speed / 2 / 16);
+    const cruise = positions[mid + 31] - positions[mid - 32];
 
-    act(() => {
-      handle.current?.rest('right');
-    });
-    const steps = sample(container, distance / speed + 1000);
-    const moving = steps.filter((step) => step > 0);
-
-    expect(Math.max(...moving)).toBeCloseTo(speed * 16, 5);
-    expect(moving.length * 16).toBeGreaterThanOrEqual(distance / speed);
-    expect(moving.length * 16).toBeLessThanOrEqual(distance / speed + 300);
+    expect(cruise).toBeGreaterThanOrEqual(speed * 1008 - 1.5);
+    expect(cruise).toBeLessThanOrEqual(speed * 1008 + 1.5);
+    expect(arrivedAt).toBeGreaterThanOrEqual(distance / speed);
+    expect(arrivedAt).toBeLessThanOrEqual(distance / speed + 400);
     expect(onRestingChange).toHaveBeenCalledWith('right');
   });
 
@@ -2392,9 +2408,10 @@ describe('PixelPet walk ramps', () => {
     act(() => {
       notifyResize?.(width);
     });
-    const steps = sample(container, 1000);
+    const resized = getPositionX(container);
+    sample(container, 1000);
 
-    expect(Math.max(...steps)).toBeCloseTo(0.12 * 16, 5);
+    expect(getPositionX(container) - resized).toBeGreaterThanOrEqual(118);
     vi.unstubAllGlobals();
   });
 
@@ -2404,16 +2421,16 @@ describe('PixelPet walk ramps', () => {
     const handle = createRef<PixelPetHandle>();
     const { container } = render(<PixelPet petName="Danko" ref={handle} />);
 
-    sample(container, 1000);
+    track(container, 1008);
     act(() => {
       handle.current?.say('Wait');
     });
     const before = getPositionX(container);
-    const steps = sample(container, 600);
+    const { positions } = track(container, 608);
 
     expect(getPositionX(container) - before).toBeGreaterThan(0);
-    expect(getPositionX(container) - before).toBeLessThanOrEqual(4.5);
-    expect(steps.slice(-10).every((step) => step === 0)).toBe(true);
+    expect(getPositionX(container) - before).toBeLessThanOrEqual(5);
+    expect(new Set(positions.slice(-10)).size).toBe(1);
   });
 
   it('stops at the edge, faces the other way for a moment, then sets off again', () => {
@@ -2633,5 +2650,117 @@ describe('PixelPet walk ramps', () => {
 
     expect(onRestingChange).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Danko' })).not.toHaveClass('pixel-pet-state-sleep');
+  });
+});
+
+describe('PixelPet pixel snapping', () => {
+  const requested: string[] = [];
+
+  class LoadedImage {
+    naturalWidth = 669;
+
+    private onLoad: (() => void) | undefined;
+
+    addEventListener(_type: string, listener: () => void) {
+      this.onLoad = listener;
+    }
+
+    removeEventListener() {}
+
+    set src(value: string) {
+      requested.push(value);
+      setTimeout(() => this.onLoad?.(), 0);
+    }
+  }
+
+  const addSheetStyle = (css: string) => {
+    const style = document.createElement('style');
+    style.id = 'scaled-sheet';
+    style.textContent = css;
+    document.head.appendChild(style);
+    return style;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0.05).mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.head.querySelector('#scaled-sheet')?.remove();
+    requested.length = 0;
+  });
+
+  const walkedPositions = (container: HTMLElement) => {
+    const positions: number[] = [];
+    for (let elapsed = 0; elapsed < 2000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      const walker = container.querySelector<HTMLElement>('.pixel-pet-container');
+      positions.push(Number(walker?.style.transform.match(/translateX\((-?[\d.]+)px\)/)?.[1]));
+    }
+    return positions;
+  };
+
+  it('draws whole pixels before the sprite image has loaded', () => {
+    const { container } = render(<PixelPet petName="Danko" />);
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(20);
+    expect(positions.every(Number.isInteger)).toBe(true);
+  });
+
+  it('snaps to one source pixel of a sheet the page has scaled up', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const style = document.createElement('style');
+    style.id = 'scaled-sheet';
+    style.textContent = '.pixel-pet-sprite { background-size: 1338px 750px; }';
+    document.head.appendChild(style);
+    const { container } = render(<PixelPet petName="Danko" spriteSrc="/pets/static.png" />);
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(10);
+    expect(positions.every((x) => x % 2 === 0)).toBe(true);
+  });
+
+  it('reads the sheet passed in spriteSrc even with parentheses in its path', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    render(<PixelPet petName="Danko" spriteSrc="/pets/static (1).png" />);
+
+    expect(requested).toEqual(['/pets/static (1).png']);
+  });
+
+  it('reads a quoted sheet path with parentheses from the stylesheet', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    addSheetStyle('.pixel-pet-sprite { background-image: url("/pets/static (1).png"); }');
+    render(<PixelPet petName="Danko" />);
+
+    expect(requested).toEqual(['/pets/static (1).png']);
+  });
+
+  it('measures the sheet scale again each time it sets off', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    const style = addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(<PixelPet petName="Danko" ref={handle} spriteSrc="/pets/static.png" />);
+
+    walkedPositions(container);
+    style.textContent = '.pixel-pet-sprite { background-size: 2007px 1125px; }';
+    act(() => {
+      handle.current?.say('Hi');
+    });
+    walkedPositions(container);
+    act(() => {
+      handle.current?.hush();
+    });
+    const positions = walkedPositions(container);
+
+    expect(new Set(positions).size).toBeGreaterThan(10);
+    expect(positions.every((x) => x % 3 === 0)).toBe(true);
   });
 });
