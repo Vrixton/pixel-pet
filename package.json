@@ -1,6 +1,6 @@
 {
   "name": "@vrixton/pixel-pet",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A pixel art pet for React that walks, sleeps, reacts to clicks, and speaks on demand.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
