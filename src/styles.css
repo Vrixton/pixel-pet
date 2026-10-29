@@ -68,7 +68,7 @@
   box-sizing: border-box;
   width: max-content;
   min-width: 120px;
-  max-width: 240px;
+  max-width: var(--pixel-pet-menu-max-width, 240px);
   padding: 4px 26px 4px 4px;
   border: var(--pixel-pet-menu-border-width, var(--_pixel-pet-dialog-border-width, 1px)) solid
     var(--pixel-pet-menu-border, var(--_pixel-pet-dialog-border, var(--pixel-pet-color, #FDDBA0)));
@@ -113,6 +113,7 @@
   color: inherit;
   font: inherit;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 

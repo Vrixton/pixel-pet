@@ -1569,7 +1569,44 @@ describe('PixelPet actions menu', () => {
     const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
 
     expect(100 + parseFloat(menu?.style.left ?? '') + 180).toBe(196);
-    expect(menu?.style.maxWidth).toBe('192px');
+    expect(menu?.style.maxWidth).toBe('min(var(--pixel-pet-menu-max-width, 240px), 192px)');
+  });
+
+  it('measures the menu again from scratch each time it opens', () => {
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (!this.classList.contains('pixel-pet-menu')) return 60;
+      return this.style.maxWidth.includes('192px') ? 192 : 300;
+    });
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    fireEvent.click(pet);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    clientWidth.mockReturnValue(600);
+    fireEvent.click(pet);
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(100 + parseFloat(menu?.style.left ?? '')).toBe(4);
+    expect(menu?.style.maxWidth).toBe('min(var(--pixel-pet-menu-max-width, 240px), 592px)');
+  });
+
+  it('lets a menu wider than 240px through when the max-width variable allows it', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('pixel-pet-menu') ? 300 : 60;
+    });
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu');
+
+    expect(100 + parseFloat(menu?.style.left ?? '')).toBe(4);
+    expect(menu?.style.maxWidth).toBe('min(var(--pixel-pet-menu-max-width, 240px), 492px)');
   });
 });
 

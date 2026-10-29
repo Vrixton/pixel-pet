@@ -103,8 +103,13 @@ interface RestState {
   origin: 'method' | 'prop';
 }
 
-const getContainedPlacement = (stageWidth: number, anchorCenter: number, boxWidth: number) => {
-  const maxWidth = Math.max(Math.min(DIALOG_MAX_WIDTH, stageWidth - DIALOG_EDGE_GAP * 2), 0);
+const getContainedPlacement = (
+  stageWidth: number,
+  anchorCenter: number,
+  boxWidth: number,
+  maxBoxWidth = DIALOG_MAX_WIDTH,
+) => {
+  const maxWidth = Math.max(Math.min(maxBoxWidth, stageWidth - DIALOG_EDGE_GAP * 2), 0);
   const width = Math.min(boxWidth, maxWidth);
   const minLeft = DIALOG_EDGE_GAP;
   const maxLeft = stageWidth - DIALOG_EDGE_GAP - width;
@@ -815,10 +820,14 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const stage = stageRef.current;
     const walker = walkerRef.current;
     const menu = menuRef.current;
-    if (!isMenuVisible || !stage || !walker || !menu) return;
+    if (!isMenuVisible) {
+      setMenuPlacement(null);
+      return;
+    }
+    if (!stage || !walker || !menu) return;
 
     const petCenter = posXRef.current + walker.offsetWidth / 2;
-    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth);
+    const { left, maxWidth } = getContainedPlacement(stage.clientWidth, petCenter, menu.offsetWidth, Infinity);
 
     setMenuPlacement({ left: left - posXRef.current, maxWidth });
   }, [isMenuVisible, actions, stageWidth]);
@@ -906,7 +915,10 @@ export const PixelPet: React.FC<PixelPetProps> = ({
             actions={actions}
             style={{
               ...getMenuFallbacks(),
-              ...(menuPlacement && { left: menuPlacement.left, maxWidth: menuPlacement.maxWidth }),
+              ...(menuPlacement && {
+                left: menuPlacement.left,
+                maxWidth: `min(var(--pixel-pet-menu-max-width, ${DIALOG_MAX_WIDTH}px), ${menuPlacement.maxWidth}px)`,
+              }),
             }}
             onSelect={selectMenuAction}
             onClose={closeMenu}
