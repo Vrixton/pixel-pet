@@ -2743,6 +2743,25 @@ describe('PixelPet pixel snapping', () => {
     expect(requested).toEqual(['/pets/static (1).png']);
   });
 
+  it('moves the walk frames by the scaled sheet, not by the source sheet', () => {
+    vi.stubGlobal('Image', LoadedImage);
+    addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');
+    render(<PixelPet petName="Danko" spriteSrc="/pets/static.png" />);
+    const pet = screen.getByRole('button', { name: 'Danko' });
+
+    const offsets = new Set<string>();
+    for (let elapsed = 0; elapsed < 3000; elapsed += 16) {
+      act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      if (pet.style.backgroundPosition) offsets.add(pet.style.backgroundPosition);
+    }
+    const scaled = Array.from({ length: 9 }, (_, frame) => `${-Math.round((frame * 600) / 9) * 2}px -146px`);
+
+    expect(offsets.size).toBe(9);
+    expect([...offsets].every((offset) => scaled.includes(offset))).toBe(true);
+  });
+
   it('measures the sheet scale again each time it sets off', () => {
     vi.stubGlobal('Image', LoadedImage);
     const style = addSheetStyle('.pixel-pet-sprite { background-size: 1338px 750px; }');

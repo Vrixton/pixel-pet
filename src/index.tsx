@@ -68,6 +68,7 @@ const DEFAULT_MENU_LABEL = '{name} actions';
 const DEFAULT_CLOSE_LABEL = 'Close menu';
 const SPRITE_MAX_WIDTH = 65;
 const INITIAL_POSITION = 100;
+const SHEET_WIDTH = 669;
 const WALK_SPEED = 0.04;
 const WALK_FRAMES = 9;
 const WALK_FRAME_WIDTH = 60;
@@ -254,6 +255,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
   const naturalWidthRef = useRef<number>(0);
   const walkFrameRef = useRef<number>(-1);
   const strideRef = useRef<number>(0);
+  const sheetScaleRef = useRef<number>(1);
   const [stageWidth, setStageWidth] = useState<number>(0);
   const stageWidthRef = useRef<number>(0);
   const [direction, setDirection] = useState<Facing>('right');
@@ -568,20 +570,25 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return Math.round(posXRef.current / unit) * unit;
   };
 
+  const getSheetWidth = (sprite: HTMLElement) =>
+    Number(getComputedStyle(sprite).backgroundSize.match(/^([\d.]+)px/)?.[1]) || naturalWidthRef.current;
+
   const stepWalkFrames = (distance: number) => {
     const sprite = petRef.current;
     if (!sprite) return;
 
     if (walkFrameRef.current < 0) {
       strideRef.current = WALK_STRIDE_IN_FRAME_WIDTHS * (sprite.offsetWidth || WALK_FRAME_WIDTH);
+      sheetScaleRef.current = (getSheetWidth(sprite) || SHEET_WIDTH) / SHEET_WIDTH;
     }
     travelledRef.current += Math.abs(distance);
     const frame = Math.floor(travelledRef.current / (strideRef.current / WALK_FRAMES)) % WALK_FRAMES;
     if (frame === walkFrameRef.current) return;
 
     walkFrameRef.current = frame;
-    const frameX = Math.round((frame * WALK_ROW_END) / WALK_FRAMES);
-    sprite.style.backgroundPosition = `-${frameX}px -${WALK_ROW_Y}px`;
+    const scale = sheetScaleRef.current;
+    const frameX = Math.round((frame * WALK_ROW_END) / WALK_FRAMES) * scale;
+    sprite.style.backgroundPosition = `-${frameX}px -${WALK_ROW_Y * scale}px`;
   };
 
   const resetWalkFrames = () => {
@@ -601,8 +608,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     const naturalWidth = naturalWidthRef.current;
     if (!sprite || !naturalWidth) return;
 
-    const sheetWidth = Number(getComputedStyle(sprite).backgroundSize.match(/^([\d.]+)px/)?.[1]);
-    const unit = (sheetWidth || naturalWidth) / naturalWidth;
+    const unit = getSheetWidth(sprite) / naturalWidth;
     if (unit === pixelUnitRef.current) return;
     pixelUnitRef.current = unit;
     applyPosition(posXRef.current);
