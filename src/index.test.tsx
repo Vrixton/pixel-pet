@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PixelPet, type PixelPetHandle } from './index';
+import { PixelPet, type DialogStyleProps, type PixelPetHandle } from './index';
 
 const getSprite = (container: HTMLElement) =>
   container.querySelector<HTMLElement>('.pixel-pet-sprite');
@@ -1503,16 +1503,57 @@ describe('PixelPet actions menu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('uses the dialog style for the menu', () => {
+  it('passes dialogStyle to the menu as a fallback that the CSS variables can override', () => {
     const { container } = render(
-      <PixelPet petName="Danko" actions={makeActions()} dialogStyle={{ backgroundColor: '#123456' }} />,
+      <PixelPet
+        petName="Danko"
+        actions={makeActions()}
+        dialogStyle={{ backgroundColor: '#123456', borderWidth: '2px', fontFamily: 'serif' }}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu')!;
 
-    expect(container.querySelector<HTMLElement>('.pixel-pet-menu')?.style.backgroundColor).toBe(
-      'rgb(18, 52, 86)',
+    expect(menu.style.getPropertyValue('--_pixel-pet-dialog-bg')).toBe('#123456');
+    expect(menu.style.getPropertyValue('--_pixel-pet-dialog-border-width')).toBe('2px');
+    expect(menu.style.getPropertyValue('--_pixel-pet-dialog-font')).toBe('serif');
+    expect(menu.style.backgroundColor).toBe('');
+    expect(menu.style.border).toBe('');
+  });
+
+  it('ignores dialogStyle keys it does not know', () => {
+    const dialogStyle = { backgroundColor: '#123456', boxShadow: 'none' } as DialogStyleProps;
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} dialogStyle={dialogStyle} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu')!;
+
+    expect([...menu.style].filter((property) => property.startsWith('--'))).toEqual(['--_pixel-pet-dialog-bg']);
+    expect(menu.getAttribute('style')).not.toContain('undefined');
+  });
+
+  it('leaves the menu to its stylesheet without dialogStyle', () => {
+    const { container } = render(<PixelPet petName="Danko" actions={makeActions()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Danko' }));
+    const menu = container.querySelector<HTMLElement>('.pixel-pet-menu')!;
+
+    expect([...menu.style].filter((property) => property.startsWith('--'))).toEqual([]);
+    expect(menu.style.backgroundColor).toBe('');
+  });
+
+  it('keeps styling the speech bubble inline with dialogStyle, as in 0.5.0', () => {
+    const handle = createRef<PixelPetHandle>();
+    const { container } = render(
+      <PixelPet petName="Danko" ref={handle} actions={makeActions()} dialogStyle={{ backgroundColor: '#123456' }} />,
     );
+
+    act(() => {
+      handle.current?.say('Hello');
+    });
+
+    expect(container.querySelector<HTMLElement>('.pixel-pet-dialog')?.style.backgroundColor).toBe('rgb(18, 52, 86)');
   });
 
   it('keeps the menu inside the container like the dialog bubble', () => {

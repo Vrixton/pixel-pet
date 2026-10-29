@@ -30,6 +30,30 @@ describe('component stylesheet', () => {
     expect(reducedMotionBlock).toMatch(/\.pixel-pet-dialog\s*\{[^}]*animation:\s*none/);
   });
 
+  it.each([
+    ['background-color', '--pixel-pet-menu-bg', '--_pixel-pet-dialog-bg'],
+    ['color', '--pixel-pet-menu-fg', '--_pixel-pet-dialog-fg'],
+    ['border-radius', '--pixel-pet-menu-radius', '--_pixel-pet-dialog-radius'],
+    ['font-family', '--pixel-pet-menu-font', '--_pixel-pet-dialog-font'],
+  ])('lets the menu variable win over dialogStyle for %s', (property, variable, fallback) => {
+    const menuRule = componentStyles.match(/\.pixel-pet-menu\s*\{[^}]*\}/)?.[0] ?? '';
+
+    expect(menuRule).toMatch(new RegExp(`${property}:\\s*var\\(${variable},\\s*var\\(${fallback},`));
+  });
+
+  it('lets the menu variables win over dialogStyle for the border', () => {
+    const menuRule = componentStyles.match(/\.pixel-pet-menu\s*\{[^}]*\}/)?.[0] ?? '';
+
+    expect(menuRule).toMatch(/border:\s*var\(--pixel-pet-menu-border-width,\s*var\(--_pixel-pet-dialog-border-width,/);
+    expect(menuRule).toMatch(/var\(--pixel-pet-menu-border,\s*var\(--_pixel-pet-dialog-border,/);
+  });
+
+  it('exposes variables for the font size, the item hover, and the focus ring', () => {
+    expect(componentStyles).toMatch(/font-size:\s*var\(--pixel-pet-menu-font-size,/);
+    expect(componentStyles).toMatch(/background-color:\s*var\(--pixel-pet-menu-item-hover-bg,/);
+    expect(componentStyles).toMatch(/outline:[^;]*var\(--pixel-pet-menu-focus,/);
+  });
+
   it('skips the menu animation for reduced motion', () => {
     const reducedMotionBlock = componentStyles.slice(
       componentStyles.indexOf('@media (prefers-reduced-motion: reduce)'),

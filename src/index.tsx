@@ -147,6 +147,15 @@ const DEFAULT_EMOTION_STYLES: Record<PetEmotion, DialogStyleProps> = {
   },
 };
 
+const MENU_FALLBACK_VARIABLES: Record<keyof DialogStyleProps, string> = {
+  backgroundColor: '--_pixel-pet-dialog-bg',
+  textColor: '--_pixel-pet-dialog-fg',
+  borderColor: '--_pixel-pet-dialog-border',
+  borderWidth: '--_pixel-pet-dialog-border-width',
+  borderRadius: '--_pixel-pet-dialog-radius',
+  fontFamily: '--_pixel-pet-dialog-font',
+};
+
 const DEFAULT_SPEECH_STYLE: DialogStyleProps = {
   backgroundColor: '#05080ceb',
   borderColor: 'var(--pixel-pet-color, #FDDBA0)',
@@ -822,6 +831,13 @@ export const PixelPet: React.FC<PixelPetProps> = ({
     return `pixel-pet-state-${action}`;
   };
 
+  const getMenuFallbacks = () =>
+    Object.fromEntries(
+      Object.entries(dialogStyle)
+        .filter(([field, value]) => value !== undefined && field in MENU_FALLBACK_VARIABLES)
+        .map(([field, value]) => [MENU_FALLBACK_VARIABLES[field as keyof DialogStyleProps], value]),
+    ) as CSSProperties;
+
   const getDialogStyle = (emotion: PetEmotion | null): CSSProperties => {
     const defaultEmotionConfig = emotion ? DEFAULT_EMOTION_STYLES[emotion] : DEFAULT_SPEECH_STYLE;
 
@@ -889,7 +905,7 @@ export const PixelPet: React.FC<PixelPetProps> = ({
             closeLabel={fillName(menuLabels?.close ?? DEFAULT_CLOSE_LABEL)}
             actions={actions}
             style={{
-              ...getDialogStyle(null),
+              ...getMenuFallbacks(),
               ...(menuPlacement && { left: menuPlacement.left, maxWidth: menuPlacement.maxWidth }),
             }}
             onSelect={selectMenuAction}
