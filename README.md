@@ -8,7 +8,7 @@ Pixel art pets for React that walk along your page, react to clicks, open a menu
 
 ![A tuxedo cat walks along a dirt path, says hi when a button is clicked, opens a menu of actions, gets curious, and walks to the right edge to fall asleep, while a hamster rolls along the path below.](docs/demo.gif)
 
-**[Play with the pets in the live demo](https://pixel-pet.vercel.app)**
+**[Play with the pets in the live demo](https://pixelpet-eight.vercel.app)**
 
 Choose a cat, a dog, an axolotl, a parakeet, or a hamster, or bring your own sprite sheet. The pet wanders along the bottom of its container, dozes off when nobody's around, changes its mood over time, and reacts when the user clicks it. Your app can make it speak, give it a menu of actions, and send it to rest in a corner until the user wakes it up.
 
@@ -326,7 +326,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm playground` opens the demo garden locally with Vite, `pnpm typecheck` checks the types of the source and the tests with TypeScript, `pnpm test` runs the tests with Vitest, and `pnpm build` builds the package with tsup. `pnpm build:demo` builds the demo garden into `demo-dist`, which is what the [live demo](https://pixel-pet.vercel.app) serves.
+`pnpm playground` opens the demo garden locally with Vite, `pnpm typecheck` checks the types of the source and the tests with TypeScript, `pnpm test` runs the tests with Vitest, and `pnpm build` builds the package with tsup. `pnpm build:demo` builds the demo garden into `demo-dist`, which is what the [live demo](https://pixelpet-eight.vercel.app) serves.
 
 The changes in each version are listed in the [changelog](CHANGELOG.md).
 
