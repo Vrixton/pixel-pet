@@ -58,6 +58,33 @@ body {
   font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.links a {
+  padding: 8px 12px;
+  background: var(--cream);
+  box-shadow:
+    0 0 0 3px var(--ink),
+    4px 4px 0 0 rgba(42, 31, 29, 0.45);
+  color: var(--ink);
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.links a:hover {
+  background: #fff3d6;
+}
+
+.links a:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 4px;
+}
+
 .plot {
   display: grid;
   grid-template-columns: 190px 1fr;

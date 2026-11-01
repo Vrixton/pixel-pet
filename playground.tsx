@@ -97,6 +97,10 @@ const App = () => (
       <h1>PixelPet</h1>
       <p>Pixel art pets for React. Tap the cat to open its menu, or the hamster to see how it feels.</p>
       <code className="install">pnpm add @vrixton/pixel-pet</code>
+      <nav className="links" aria-label="Project links">
+        <a href="https://github.com/Vrixton/pixel-pet">GitHub</a>
+        <a href="https://www.npmjs.com/package/@vrixton/pixel-pet">npm</a>
+      </nav>
     </header>
     {LIVE_PETS.map((pet) => (
       <Plot key={pet.variant} {...pet} />
